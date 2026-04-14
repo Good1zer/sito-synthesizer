@@ -1256,6 +1256,9 @@ void AudioPluginAudioProcessorEditor::resized()
         if (knobAnimationStates.find (&slider) == knobAnimationStates.end())
             knobAnimationStates[&slider] = KnobAnimationState();
         knobAnimationStates[&slider].isPrimary = isPrimary;
+        
+        // Set isPrimary property for LookAndFeel to access
+        slider.getProperties().set ("isPrimary", isPrimary);
     };
 
     // Slots: Source (0..1), Grain (2..4), Output (5..7)

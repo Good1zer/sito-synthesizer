@@ -36,14 +36,17 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
     const auto modPreview = static_cast<float> (slider.getProperties().getWithDefault ("modPreview", 0.0f));
     const auto modSelected = static_cast<bool> (slider.getProperties().getWithDefault ("modSelected", false));
     const auto modBypassed = static_cast<bool> (slider.getProperties().getWithDefault ("modBypassed", false));
+    const auto isPrimary = static_cast<bool> (slider.getProperties().getWithDefault ("isPrimary", false));
 
     // Premium knob background with subtle gradient feel
     g.setColour (juce::Colour (0xff1a1a20));
     g.fillEllipse (knobBounds);
 
-    // Soft outer glow for depth
-    g.setColour (activeAccent.withAlpha (isActive ? 0.25f : 0.12f));
-    g.fillEllipse (knobBounds.expanded (3.0f));
+    // Soft outer glow for depth - differentiated for primary controls
+    const auto glowIntensity = isPrimary ? 0.35f : 0.25f;
+    const auto glowRadius = isPrimary ? 16.0f : 12.0f;
+    g.setColour (activeAccent.withAlpha (isActive ? glowIntensity : glowIntensity * 0.5f));
+    g.fillEllipse (knobBounds.expanded (glowRadius * 0.2f));
 
     // Refined knob border - thinner and more elegant
     g.setColour (getCardBorderColour().withAlpha (isActive ? 0.55f : 0.35f));
@@ -57,7 +60,7 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
     g.setColour (juce::Colour (0xff000000).withAlpha (0.15f));
     g.drawEllipse (knobBounds.reduced (5.0f), 6.0f);
 
-    // Value arc - thinner and more refined
+    // Value arc - differentiated thickness for primary controls
     juce::Path valueArc;
     valueArc.addCentredArc (centre.x, centre.y,
                             trackRadius, trackRadius,
@@ -67,7 +70,7 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
                             true);
 
     g.setColour (activeAccent);
-    const auto arcThickness = juce::jlimit (2.0f, 4.0f, radius * 0.12f);
+    const auto arcThickness = isPrimary ? 4.5f : 3.5f;
     g.strokePath (valueArc, juce::PathStrokeType (arcThickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
     // Modulation visualization
@@ -94,6 +97,23 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
                       juce::PathStrokeType (modSelected ? 2.8f : 2.0f,
                                             juce::PathStrokeType::curved,
                                             juce::PathStrokeType::rounded));
+        
+        // MOD badge indicator in top-right corner
+        auto badgeArea = juce::Rectangle<float> (knobBounds.getRight() - 20.0f, knobBounds.getY(), 20.0f, 14.0f);
+        
+        g.setColour (getAccentColour().withAlpha (0.8f));
+        g.fillRoundedRectangle (badgeArea, 3.0f);
+        
+        g.setColour (getTextPrimaryColour());
+        g.setFont (juce::Font (8.0f, juce::Font::bold));
+        g.drawFittedText ("MOD", badgeArea.toNearestInt(), juce::Justification::centred, 1);
+        
+        // Pulse glow around knob when modulation is active
+        float pulsePhase = std::fmod (static_cast<float>(juce::Time::getMillisecondCounterHiRes()) / 1500.0f, 1.0f);
+        float pulseAlpha = 0.2f + 0.3f * std::sin (pulsePhase * juce::MathConstants<float>::twoPi);
+        
+        g.setColour (getAccentGlowColour().withAlpha (pulseAlpha));
+        g.drawEllipse (knobBounds.expanded (4.0f), 1.5f);
     }
 
     // Special visualization for shape parameter
