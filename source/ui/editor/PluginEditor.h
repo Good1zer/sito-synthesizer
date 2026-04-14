@@ -87,8 +87,9 @@ private:
     juce::Point<float> modulationDragPosition;
     float modulationHandleDragStartY = 0.0f;
     float modulationHandleStartAmount = 0.0f;
-    float lfoPreviewPhase = 0.0f;
-    int selectedModulationTarget = -1;
+     float lfoPreviewPhase = 0.0f;
+     float waveformPulsePhase = 0.0f;
+     int selectedModulationTarget = -1;
     int hoveredModulationTarget = -1;
     int draggingModulationTarget = -1;
     Page currentPage = Page::sample;

@@ -640,6 +640,11 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     const auto rateHz = juce::jlimit (0.01f, 20.0f, static_cast<float> (lfo1RateSlider.getValue()));
     lfoPreviewPhase += rateHz / 20.0f;
     lfoPreviewPhase -= std::floor (lfoPreviewPhase);
+    
+    // Waveform pulse animation: 1.5 Hz cycle (0.667 seconds per cycle)
+    waveformPulsePhase += 1.5f / 20.0f;
+    waveformPulsePhase -= std::floor (waveformPulsePhase);
+    
     refreshModulationSliderDecorations();
 
     if (currentPage == Page::sample)
@@ -729,8 +734,14 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
             centreLine.lineTo (x, y);
         }
 
+        // Outer glow pass with pulse animation
+        const auto pulseAlpha = 0.4f + 0.15f * std::sin (waveformPulsePhase * juce::MathConstants<float>::twoPi);
+        g.setColour (accentGlowColour.withAlpha (pulseAlpha));
+        g.strokePath (centreLine, juce::PathStrokeType (5.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        
+        // Main waveform stroke with increased thickness
         g.setColour (accentGlowColour.withAlpha (0.72f));
-        g.strokePath (centreLine, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.strokePath (centreLine, juce::PathStrokeType (3.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
     // Position + Spray overlay (very important UX for granular)
