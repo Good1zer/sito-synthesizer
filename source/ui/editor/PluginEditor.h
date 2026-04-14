@@ -51,6 +51,28 @@ private:
         bool isPrimary = false;
     };
 
+    struct PageTransitionState
+    {
+        float fadeAlpha = 1.0f;
+        Page targetPage = Page::sample;
+        bool isTransitioning = false;
+    };
+
+    struct ModulationHandleState
+    {
+        float scaleAmount = 1.0f;
+        float glowAlpha = 0.0f;
+        bool isAssigned = false;
+    };
+
+    struct AssignmentWorkflowState
+    {
+        float dragLineAlpha = 0.0f;
+        float targetPulsePhase = 0.0f;
+        float assignmentFeedbackAlpha = 0.0f;
+        bool isAssignmentComplete = false;
+    };
+
     void timerCallback() override;
     void updateSampleStatus();
     void configureKnob (juce::Slider& slider, juce::Label& label, const juce::String& text);
@@ -188,6 +210,15 @@ private:
     
     // Knob animation states for visual hierarchy
     std::map<juce::Slider*, KnobAnimationState> knobAnimationStates;
+    
+    // Page transition animation state
+    PageTransitionState pageTransitionState;
+    
+    // Modulation handle animation states
+    std::map<int, ModulationHandleState> modulationHandleStates;
+    
+    // Assignment workflow state for drag-to-assign feedback
+    AssignmentWorkflowState assignmentWorkflowState;
     
     std::unique_ptr<PresetBrowser> presetBrowser;
 

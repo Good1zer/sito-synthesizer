@@ -661,6 +661,36 @@ void AudioPluginAudioProcessorEditor::timerCallback()
             state.arcAnimationPhase -= 1.0f;
     }
     
+    // Update assignment workflow feedback animations
+    if (isDraggingModulationSource)
+    {
+        // Fade in drag line and target feedback
+        assignmentWorkflowState.dragLineAlpha += (1.0f - assignmentWorkflowState.dragLineAlpha) * easeOutFactor;
+        assignmentWorkflowState.targetPulsePhase += 0.08f;
+        if (assignmentWorkflowState.targetPulsePhase > 1.0f)
+            assignmentWorkflowState.targetPulsePhase -= 1.0f;
+        
+        // Scale up hovered target handle
+        if (hoveredModulationTarget >= 0)
+        {
+            auto& handleState = modulationHandleStates[hoveredModulationTarget];
+            handleState.scaleAmount += (1.3f - handleState.scaleAmount) * easeOutFactor;
+            handleState.glowAlpha += (0.8f - handleState.glowAlpha) * easeOutFactor;
+        }
+    }
+    else
+    {
+        // Fade out drag line and reset feedback
+        assignmentWorkflowState.dragLineAlpha += (0.0f - assignmentWorkflowState.dragLineAlpha) * easeOutFactor;
+        
+        // Reset all handle scales
+        for (auto& [index, handleState] : modulationHandleStates)
+        {
+            handleState.scaleAmount += (1.0f - handleState.scaleAmount) * easeOutFactor;
+            handleState.glowAlpha += (0.0f - handleState.glowAlpha) * easeOutFactor;
+        }
+    }
+    
     refreshModulationSliderDecorations();
 
     // Keep preset browser on top if visible
@@ -1781,7 +1811,10 @@ void AudioPluginAudioProcessorEditor::configureKnob (juce::Slider& slider,
 
 void AudioPluginAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
 {
-    if (currentPage != Page::settings)
+    // Don't render modulation handles if preset browser is visible (z-order fix)
+    const auto presetBrowserVisible = presetBrowser && presetBrowser->isVisible();
+    
+    if (currentPage != Page::settings && !presetBrowserVisible)
     {
         for (int index = 0; index < 8; ++index)
         {
@@ -1806,16 +1839,23 @@ void AudioPluginAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
             const auto tint = amount >= 0.0f ? accentGlowColour : juce::Colour (0xffff7aa8);
             const auto normalized = juce::jlimit (0.0f, 1.0f, std::abs (amount));
 
+            // Get animation state for this handle
+            auto handleState = modulationHandleStates[index];
+            const auto scaledHandle = handle.withSizeKeepingCentre (handle.getWidth() * handleState.scaleAmount,
+                                                                     handle.getHeight() * handleState.scaleAmount);
+
             g.setColour (juce::Colour (0xff1b1423).withAlpha (0.96f));
-            g.fillEllipse (handle);
-            g.setColour (tint.withAlpha (bypassed ? 0.34f : (isHot ? 0.95f : 0.72f)));
-            g.drawEllipse (handle, isHot ? 1.6f : 1.2f);
+            g.fillEllipse (scaledHandle);
+            
+            // Enhanced glow during assignment workflow
+            g.setColour (tint.withAlpha (bypassed ? 0.34f : (isHot ? 0.95f : 0.72f) + handleState.glowAlpha * 0.3f));
+            g.drawEllipse (scaledHandle, isHot ? 1.6f : 1.2f);
 
             juce::Path amountArc;
-            amountArc.addCentredArc (handle.getCentreX(),
-                                     handle.getCentreY(),
-                                     handle.getWidth() * 0.34f,
-                                     handle.getHeight() * 0.34f,
+            amountArc.addCentredArc (scaledHandle.getCentreX(),
+                                     scaledHandle.getCentreY(),
+                                     scaledHandle.getWidth() * 0.34f,
+                                     scaledHandle.getHeight() * 0.34f,
                                      0.0f,
                                      -juce::MathConstants<float>::halfPi,
                                      -juce::MathConstants<float>::halfPi + juce::MathConstants<float>::twoPi * normalized,
@@ -1824,13 +1864,13 @@ void AudioPluginAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
             g.strokePath (amountArc, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
             g.setColour (tint.withAlpha (bypassed ? 0.36f : 0.95f));
-            g.fillEllipse (handle.getCentreX() - 2.0f, handle.getCentreY() - 2.0f, 4.0f, 4.0f);
+            g.fillEllipse (scaledHandle.getCentreX() - 2.0f, scaledHandle.getCentreY() - 2.0f, 4.0f, 4.0f);
 
             if (bypassed)
             {
                 g.setColour (tint.withAlpha (0.50f));
-                g.drawLine (handle.getX() + 4.0f, handle.getBottom() - 4.0f,
-                            handle.getRight() - 4.0f, handle.getY() + 4.0f, 1.2f);
+                g.drawLine (scaledHandle.getX() + 4.0f, scaledHandle.getBottom() - 4.0f,
+                            scaledHandle.getRight() - 4.0f, scaledHandle.getY() + 4.0f, 1.2f);
             }
         }
     }
