@@ -44,6 +44,13 @@ private:
         settings
     };
 
+    struct KnobAnimationState
+    {
+        float hoverAlpha = 0.0f;
+        float arcAnimationPhase = 0.0f;
+        bool isPrimary = false;
+    };
+
     void timerCallback() override;
     void updateSampleStatus();
     void configureKnob (juce::Slider& slider, juce::Label& label, const juce::String& text);
@@ -178,6 +185,9 @@ private:
     std::array<int, 18> densityRateCodes {};
     int densityRateCodeCount = 0;
     bool isUpdatingDensityRateUI = false;
+    
+    // Knob animation states for visual hierarchy
+    std::map<juce::Slider*, KnobAnimationState> knobAnimationStates;
     
     std::unique_ptr<PresetBrowser> presetBrowser;
 

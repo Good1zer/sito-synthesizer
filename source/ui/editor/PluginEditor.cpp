@@ -645,7 +645,27 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     waveformPulsePhase += 1.5f / 20.0f;
     waveformPulsePhase -= std::floor (waveformPulsePhase);
     
+    // Update knob animation states (hover transitions and arc animations)
+    const auto easeOutFactor = 0.2f; // 150ms ease-out at 20fps
+    for (auto& [slider, state] : knobAnimationStates)
+    {
+        if (slider == nullptr)
+            continue;
+        
+        const auto targetHover = slider->isMouseOverOrDragging() ? 1.0f : 0.0f;
+        state.hoverAlpha += (targetHover - state.hoverAlpha) * easeOutFactor;
+        
+        // Arc animation: increment phase for smooth arc drawing
+        state.arcAnimationPhase += 0.05f;
+        if (state.arcAnimationPhase > 1.0f)
+            state.arcAnimationPhase -= 1.0f;
+    }
+    
     refreshModulationSliderDecorations();
+
+    // Keep preset browser on top if visible
+    if (presetBrowser && presetBrowser->isVisible())
+        presetBrowser->toFront (true);
 
     if (currentPage == Page::sample)
         repaint (sampleDropZone);
@@ -1194,25 +1214,32 @@ void AudioPluginAudioProcessorEditor::resized()
         return { x, row.getY(), w, row.getHeight() };
     };
 
-    auto placeKnob = [&] (int index, juce::Slider& slider, juce::Label& label)
+    auto placeKnob = [&] (int index, juce::Slider& slider, juce::Label& label, bool isPrimary = false)
     {
         label.setBounds (slotAt (labelRow, index));
 
         auto slot = slotAt (knobRow, index).reduced (2, 0);
-        slider.setBounds (slot.withSizeKeepingCentre (knobSize, knobSize));
+        const int effectiveKnobSize = isPrimary ? 90 : knobSize;
+        slider.setBounds (slot.withSizeKeepingCentre (effectiveKnobSize, effectiveKnobSize));
+        
+        // Initialize or update animation state
+        if (knobAnimationStates.find (&slider) == knobAnimationStates.end())
+            knobAnimationStates[&slider] = KnobAnimationState();
+        knobAnimationStates[&slider].isPrimary = isPrimary;
     };
 
     // Slots: Source (0..1), Grain (2..4), Output (5..7)
-    placeKnob (0, positionSlider, positionLabel);
-    placeKnob (1, spraySlider, sprayLabel);
-    placeKnob (2, grainSizeSlider, grainSizeLabel);
-    placeKnob (3, densitySlider, densityLabel);
-    placeKnob (3, densitySyncSlider, densitySyncLabel);
-    placeKnob (3, densityRateSlider, densityRateLabel);
-    placeKnob (4, shapeSlider, shapeLabel);
-    placeKnob (5, pitchSlider, pitchLabel);
-    placeKnob (6, spreadSlider, spreadLabel);
-    placeKnob (7, gainSlider, gainLabel);
+    // Primary controls: Position (0), Grain Size (2), Density (3)
+    placeKnob (0, positionSlider, positionLabel, true);
+    placeKnob (1, spraySlider, sprayLabel, false);
+    placeKnob (2, grainSizeSlider, grainSizeLabel, true);
+    placeKnob (3, densitySlider, densityLabel, true);
+    placeKnob (3, densitySyncSlider, densitySyncLabel, true);
+    placeKnob (3, densityRateSlider, densityRateLabel, true);
+    placeKnob (4, shapeSlider, shapeLabel, false);
+    placeKnob (5, pitchSlider, pitchLabel, false);
+    placeKnob (6, spreadSlider, spreadLabel, false);
+    placeKnob (7, gainSlider, gainLabel, false);
 
     sourceHeaderZone = headerRow.withX (slotAt (headerRow, 0).getX())
                              .withRight (slotAt (headerRow, 1).getRight());
@@ -1548,6 +1575,15 @@ void AudioPluginAudioProcessorEditor::refreshModulationSliderDecorations()
         slider->getProperties().set ("modSelected",
                                      currentPage == Page::modulation
                                          && (targetIndex == selectedModulationTarget || targetIndex == hoveredModulationTarget));
+        
+        // Pass animation state to look and feel
+        if (knobAnimationStates.find (slider) != knobAnimationStates.end())
+        {
+            const auto& state = knobAnimationStates[slider];
+            slider->getProperties().set ("hoverAlpha", state.hoverAlpha);
+            slider->getProperties().set ("arcAnimationPhase", state.arcAnimationPhase);
+            slider->getProperties().set ("isPrimary", state.isPrimary);
+        }
     }
 
     densityRateSlider.getProperties().set ("modAmount", processorRef.getLfo1AssignmentAmount (ParameterIDs::densityHz));
@@ -1557,6 +1593,15 @@ void AudioPluginAudioProcessorEditor::refreshModulationSliderDecorations()
                                            currentPage == Page::modulation
                                                && (selectedModulationTarget == AudioPluginAudioProcessor::getModulationTargetIndexForParameter (ParameterIDs::densityHz)
                                                    || hoveredModulationTarget == AudioPluginAudioProcessor::getModulationTargetIndexForParameter (ParameterIDs::densityHz)));
+    
+    // Pass animation state for density rate slider
+    if (knobAnimationStates.find (&densityRateSlider) != knobAnimationStates.end())
+    {
+        const auto& state = knobAnimationStates[&densityRateSlider];
+        densityRateSlider.getProperties().set ("hoverAlpha", state.hoverAlpha);
+        densityRateSlider.getProperties().set ("arcAnimationPhase", state.arcAnimationPhase);
+        densityRateSlider.getProperties().set ("isPrimary", state.isPrimary);
+    }
 }
 
 bool AudioPluginAudioProcessorEditor::isInterestedInFileDrag (const juce::StringArray& files)
