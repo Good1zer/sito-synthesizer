@@ -1,5 +1,7 @@
 #pragma once
-#include <PluginProcessor.h>
+#include "plugin/PluginProcessor.h"
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
 
 /* This is a helper function to run tests within the context of a plugin editor.
  *
@@ -22,10 +24,13 @@
 [[maybe_unused]] static void runWithinPluginEditor (const std::function<void (PluginProcessor& plugin)>& testCode)
 {
     PluginProcessor plugin;
-    const auto editor = plugin.createEditorIfNeeded();
+    auto* editor = plugin.createEditorIfNeeded();
 
     testCode (plugin);
 
-    plugin.editorBeingDeleted (editor);
-    delete editor;
+    if (editor != nullptr)
+    {
+        plugin.editorBeingDeleted (editor);
+        delete editor;
+    }
 }
