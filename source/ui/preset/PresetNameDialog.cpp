@@ -124,9 +124,6 @@ PresetNameDialog::~PresetNameDialog()
 
 void PresetNameDialog::paint (juce::Graphics& g)
 {
-    // Background with subtle gradient
-    g.fillAll (backgroundColour.withAlpha (0.95f));
-
     auto bounds = getLocalBounds().toFloat();
 
     // Main panel

@@ -94,9 +94,6 @@ PresetBrowser::~PresetBrowser()
 
 void PresetBrowser::paint (juce::Graphics& g)
 {
-    // Background with subtle gradient
-    g.fillAll (backgroundColour);
-    
     auto bounds = getLocalBounds().toFloat();
     
     // Main panel
