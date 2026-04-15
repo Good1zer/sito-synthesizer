@@ -24,7 +24,13 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
                                                 static_cast<float> (height)).reduced (10.0f, 8.0f);
 
     const auto diameter = juce::jmin (bounds.getWidth(), bounds.getHeight());
-    const auto knobBounds = juce::Rectangle<float> (diameter, diameter).withCentre (
+    
+    // Apply hover scale animation (1.0 → 1.05x)
+    const auto hoverAlpha = static_cast<float> (slider.getProperties().getWithDefault ("hoverAlpha", 0.0f));
+    const auto scale = 1.0f + (hoverAlpha * 0.05f);
+    const auto scaledDiameter = diameter * scale;
+    
+    const auto knobBounds = juce::Rectangle<float> (scaledDiameter, scaledDiameter).withCentre (
         juce::Point<float> (bounds.getCentreX(), bounds.getCentreY() - 4.0f));
     const auto centre = knobBounds.getCentre();
     const auto radius = diameter * 0.5f;

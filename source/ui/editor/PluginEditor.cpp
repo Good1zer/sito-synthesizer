@@ -691,6 +691,18 @@ void AudioPluginAudioProcessorEditor::timerCallback()
         }
     }
     
+    // Page transition animation (200ms fade)
+    if (pageTransitionState.isTransitioning)
+    {
+        pageTransitionState.fadeAlpha += 0.1f; // 200ms at 20fps
+        if (pageTransitionState.fadeAlpha >= 1.0f)
+        {
+            pageTransitionState.fadeAlpha = 1.0f;
+            pageTransitionState.isTransitioning = false;
+        }
+        repaint();
+    }
+    
     refreshModulationSliderDecorations();
 
     // Keep preset browser on top if visible
@@ -1373,6 +1385,14 @@ void AudioPluginAudioProcessorEditor::resized()
 
 void AudioPluginAudioProcessorEditor::updatePageVisibility()
 {
+    // Trigger page transition if page changed
+    if (currentPage != pageTransitionState.targetPage)
+    {
+        pageTransitionState.targetPage = currentPage;
+        pageTransitionState.isTransitioning = true;
+        pageTransitionState.fadeAlpha = 0.0f;
+    }
+    
     samplePageButton.setToggleState (currentPage == Page::sample, juce::dontSendNotification);
     modulationPageButton.setToggleState (currentPage == Page::modulation, juce::dontSendNotification);
     settingsPageButton.setToggleState (currentPage == Page::settings, juce::dontSendNotification);
