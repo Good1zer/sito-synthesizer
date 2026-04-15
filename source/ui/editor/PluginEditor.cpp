@@ -691,10 +691,10 @@ void AudioPluginAudioProcessorEditor::timerCallback()
         }
     }
     
-    // Page transition animation (200ms fade)
+    // Page transition animation (150ms ease-out cubic)
     if (pageTransitionState.isTransitioning)
     {
-        pageTransitionState.fadeAlpha += 0.1f; // 200ms at 20fps
+        pageTransitionState.fadeAlpha += 0.133f; // 150ms at 20fps
         if (pageTransitionState.fadeAlpha >= 1.0f)
         {
             pageTransitionState.fadeAlpha = 1.0f;
@@ -980,10 +980,18 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     if (currentPage == Page::modulation)
     {
         const auto panel = pageContentZone.toFloat();
-        g.setColour (cardColour.withAlpha (0.96f));
-        g.fillRoundedRectangle (panel, 22.0f);
-        g.setColour (cardBorderColour.withAlpha (0.22f));
-        g.drawRoundedRectangle (panel, 22.0f, 0.9f);
+        
+        // Premium transition: ease-out cubic + slide
+        const auto rawAlpha = pageTransitionState.isTransitioning ? pageTransitionState.fadeAlpha : 1.0f;
+        const auto easeOutCubic = 1.0f - std::pow(1.0f - rawAlpha, 3.0f);
+        const auto slideOffset = (1.0f - easeOutCubic) * 12.0f;
+        
+        auto transitionedPanel = panel.translated(slideOffset, 0.0f);
+        
+        g.setColour (cardColour.withAlpha (0.96f * easeOutCubic));
+        g.fillRoundedRectangle (transitionedPanel, 22.0f);
+        g.setColour (cardBorderColour.withAlpha (0.22f * easeOutCubic));
+        g.drawRoundedRectangle (transitionedPanel, 22.0f, 0.9f);
 
         auto content = panel.reduced (32.0f, 28.0f);
         auto heading = content.removeFromTop (26.0f);
@@ -1038,10 +1046,18 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     else if (currentPage == Page::settings)
     {
         const auto panel = pageContentZone.toFloat();
-        g.setColour (cardColour.withAlpha (0.96f));
-        g.fillRoundedRectangle (panel, 22.0f);
-        g.setColour (cardBorderColour.withAlpha (0.22f));
-        g.drawRoundedRectangle (panel, 22.0f, 0.9f);
+        
+        // Premium transition: ease-out cubic + slide
+        const auto rawAlpha = pageTransitionState.isTransitioning ? pageTransitionState.fadeAlpha : 1.0f;
+        const auto easeOutCubic = 1.0f - std::pow(1.0f - rawAlpha, 3.0f);
+        const auto slideOffset = (1.0f - easeOutCubic) * 12.0f;
+        
+        auto transitionedPanel = panel.translated(slideOffset, 0.0f);
+        
+        g.setColour (cardColour.withAlpha (0.96f * easeOutCubic));
+        g.fillRoundedRectangle (transitionedPanel, 22.0f);
+        g.setColour (cardBorderColour.withAlpha (0.22f * easeOutCubic));
+        g.drawRoundedRectangle (transitionedPanel, 22.0f, 0.9f);
 
         auto content = panel.reduced (32.0f, 28.0f);
         auto heading = content.removeFromTop (26.0f);
