@@ -1033,14 +1033,34 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
                 lfoPath.lineTo (x, y);
         }
 
+        // Center line
         g.setColour (accentColour.withAlpha (0.10f));
         g.drawLine (lfoArea.getX(), lfoMidY, lfoArea.getRight(), lfoMidY, 1.0f);
+        
+        // Glow behind waveform
+        g.setColour (accentGlowColour.withAlpha (0.15f));
+        g.strokePath (lfoPath, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        
+        // Main waveform
         g.setColour (accentGlowColour.withAlpha (0.90f));
         g.strokePath (lfoPath, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-        const auto indicatorX = lfoArea.getCentreX();
+        // Animated dot at current value (at the start of the waveform)
+        const auto currentValue = evaluateLfoPreview (lfoPreviewPhase, shapeValue);
+        const auto dotX = lfoArea.getX();
+        const auto dotY = lfoMidY - currentValue * lfoAmp;
+        
+        // Dot glow
+        g.setColour (accentGlowColour.withAlpha (0.35f));
+        g.fillEllipse (dotX - 6.0f, dotY - 6.0f, 12.0f, 12.0f);
+        
+        // Dot core
+        g.setColour (accentGlowColour);
+        g.fillEllipse (dotX - 4.0f, dotY - 4.0f, 8.0f, 8.0f);
+        
+        // Vertical indicator line
         g.setColour (accentGlowColour.withAlpha (0.22f));
-        g.drawLine (indicatorX, lfoArea.getY(), indicatorX, lfoArea.getBottom(), 1.0f);
+        g.drawLine (dotX, lfoArea.getY(), dotX, lfoArea.getBottom(), 1.0f);
 
     }
     else if (currentPage == Page::settings)
