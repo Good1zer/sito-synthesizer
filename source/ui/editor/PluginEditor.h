@@ -1,11 +1,11 @@
 #pragma once
 
-#include <array>
-#include <limits>
-
 #include "plugin/PluginProcessor.h"
 #include "ui/lookandfeel/SitoLookAndFeel.h"
 #include "ui/preset/PresetBrowser.h"
+
+#include <array>
+#include <limits>
 
 //==============================================================================
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
@@ -163,6 +163,7 @@ private:
     juce::ToggleButton densityDottedButton;
     juce::Slider maxVoicesSlider;
     juce::ComboBox interpolationQualityCombo;
+    juce::ComboBox rootKeyCombo;
 
     juce::Label positionLabel;
     juce::Label sprayLabel;
@@ -180,6 +181,7 @@ private:
     juce::Label lfo1AmountLabel;
     juce::Label maxVoicesLabel;
     juce::Label voicesValueLabel;
+    juce::Label rootKeyLabel;
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
@@ -203,6 +205,7 @@ private:
     std::unique_ptr<ButtonAttachment> densitySyncDottedEnabledAttachment;
     std::unique_ptr<SliderAttachment> maxVoicesAttachment;
     std::unique_ptr<ComboBoxAttachment> interpolationQualityAttachment;
+    std::unique_ptr<ComboBoxAttachment> rootKeyAttachment;
 
     std::array<int, 18> densityRateCodes {};
     int densityRateCodeCount = 0;

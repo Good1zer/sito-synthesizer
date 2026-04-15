@@ -92,6 +92,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     maxVoicesParam = parameters.getRawParameterValue (ParameterIDs::maxVoices);
     trueStereoEnabledParam = parameters.getRawParameterValue (ParameterIDs::trueStereoEnabled);
     interpolationQualityParam = parameters.getRawParameterValue (ParameterIDs::interpolationQuality);
+    rootKeyParam = parameters.getRawParameterValue (ParameterIDs::rootKey);
 
     ensureModulationStateTree();
     restoreModulationAssignmentsFromState();
@@ -218,6 +219,14 @@ AudioPluginAudioProcessor::createParameterLayout()
         ParameterNames::interpolationQuality,
         juce::StringArray { "Linear", "Cubic (High Quality)" },
         ParameterDefaults::interpolationQuality));
+
+    // Root key: MIDI note 0-127 (C-2 to G8)
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParameterIDs::rootKey, 1 },
+        ParameterNames::rootKey,
+        0,
+        127,
+        ParameterDefaults::rootKey));
 
     return { params.begin(), params.end() };
 }
@@ -374,7 +383,13 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const auto spreadUsed = applyModulation (ParameterIDs::spread, spreadParam->load(), 0.0f, 1.0f, 0.5f);
     const auto grainSizeMsUsed = applyModulation (ParameterIDs::grainSizeMs, grainSizeParam->load(), 10.0f, 500.0f, 245.0f);
     densityHzUsed = applyModulation (ParameterIDs::densityHz, densityHzUsed, 0.1f, 1200.0f, 60.0f);
-    const auto pitchSemitonesUsed = applyModulation (ParameterIDs::pitchSemitones, pitchParam->load(), -24.0f, 24.0f, 24.0f);
+    
+    // Apply root key offset: convert MIDI note to semitone offset from C4 (60)
+    const auto rootKeyNote = static_cast<int> (rootKeyParam->load());
+    const auto rootKeyOffset = static_cast<float> (rootKeyNote - 60);
+    const auto pitchWithRoot = pitchParam->load() + rootKeyOffset;
+    const auto pitchSemitonesUsed = applyModulation (ParameterIDs::pitchSemitones, pitchWithRoot, -24.0f, 24.0f, 24.0f);
+    
     const auto shapeTypeUsed = applyModulation (ParameterIDs::shapeType, shapeTypeParam->load(), 0.0f, 100.0f, 50.0f);
 
     granularEngine.render (buffer,

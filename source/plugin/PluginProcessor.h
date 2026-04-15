@@ -1,9 +1,9 @@
 #pragma once
 
+#include <juce_audio_processors/juce_audio_processors.h>
+
 #include <atomic>
 #include <vector>
-
-#include <juce_audio_processors/juce_audio_processors.h>
 
 #include "dsp/GranularEngine.h"
 #include "sample/SampleData.h"
@@ -36,6 +36,7 @@ namespace ParameterIDs
     static constexpr auto maxVoices = "maxVoices";
     static constexpr auto trueStereoEnabled = "trueStereoEnabled";
     static constexpr auto interpolationQuality = "interpolationQuality";
+    static constexpr auto rootKey = "rootKey";
 }
 
 namespace ParameterNames
@@ -59,6 +60,7 @@ namespace ParameterNames
     static constexpr auto maxVoices = "Max Voices";
     static constexpr auto trueStereoEnabled = "True Stereo";
     static constexpr auto interpolationQuality = "Interpolation";
+    static constexpr auto rootKey = "Root Key";
 }
 
 namespace ParameterDefaults
@@ -82,6 +84,7 @@ namespace ParameterDefaults
     static constexpr int maxVoices = 8;
     static constexpr bool trueStereoEnabled = true;
     static constexpr int interpolationQuality = 0; // 0 = Linear, 1 = Cubic (High Quality)
+    static constexpr int rootKey = 60; // C4 (MIDI note 60)
 }
 
 //==============================================================================
@@ -169,6 +172,7 @@ private:
     std::atomic<float>* maxVoicesParam = nullptr;
     std::atomic<float>* trueStereoEnabledParam = nullptr;
     std::atomic<float>* interpolationQualityParam = nullptr;
+    std::atomic<float>* rootKeyParam = nullptr;
 
     juce::CriticalSection modulationStateLock;
     juce::ValueTree modulationStateTree;

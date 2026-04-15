@@ -98,8 +98,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     sampleHintLabel.setText ("Drop WAV / AIFF / FLAC / MP3 here",
                              juce::dontSendNotification);
-    sampleHintLabel.setJustificationType (juce::Justification::centred);
-    sampleHintLabel.setFont (juce::Font (juce::FontOptions (16.0f, juce::Font::bold)));
+    sampleHintLabel.setJustificationType (juce::Justification::centredLeft);
+    sampleHintLabel.setFont (juce::Font (juce::FontOptions (13.0f, juce::Font::bold)));
     sampleHintLabel.setColour (juce::Label::textColourId, textPrimary);
     sampleHintLabel.setInterceptsMouseClicks (false, false);
     addAndMakeVisible (sampleHintLabel);
@@ -499,6 +499,17 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     addAndMakeVisible (interpolationQualityCombo);
     interpolationQualityAttachment = std::make_unique<ComboBoxAttachment> (params, ParameterIDs::interpolationQuality, interpolationQualityCombo);
 
+    // Root key combo - just note names without octaves
+    const char* noteNames[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    for (int i = 0; i < 12; ++i)
+    {
+        rootKeyCombo.addItem (noteNames[i], i + 1);
+    }
+    rootKeyCombo.setTooltip ("Root key of the sample");
+    rootKeyCombo.setLookAndFeel (&lookAndFeel);
+    addAndMakeVisible (rootKeyCombo);
+    rootKeyAttachment = std::make_unique<ComboBoxAttachment> (params, ParameterIDs::rootKey, rootKeyCombo);
+
     configureKnob (maxVoicesSlider, maxVoicesLabel, "Voices");
     maxVoicesSlider.setNumDecimalPlacesToDisplay (0);
     maxVoicesAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::maxVoices, maxVoicesSlider);
@@ -622,6 +633,7 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
     densityTripletButton.setLookAndFeel (nullptr);
     densityDottedButton.setLookAndFeel (nullptr);
     interpolationQualityCombo.setLookAndFeel (nullptr);
+    rootKeyCombo.setLookAndFeel (nullptr);
     presetPrevButton.setLookAndFeel (nullptr);
     presetNextButton.setLookAndFeel (nullptr);
     presetSaveButton.setLookAndFeel (nullptr);
@@ -923,19 +935,33 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
         }
     }
 
+    // Sample info bar background (when loaded)
+    if (processorRef.hasLoadedSample())
+    {
+        auto header = sampleZone.reduced (20.0f, 14.0f);
+        header.removeFromTop (18.0f); // skip name
+        auto infoBarBg = header.removeFromTop (24.0f);
+        
+        g.setColour (juce::Colour (0xff1a1a22).withAlpha (0.65f));
+        g.fillRoundedRectangle (infoBarBg, 8.0f);
+        g.setColour (cardBorderColour.withAlpha (0.12f));
+        g.drawRoundedRectangle (infoBarBg, 8.0f, 0.6f);
+    }
+
     // Refined divider under the sample header row
     auto topDivider = sampleZone.reduced (18.0f, 18.0f);
+    const auto dividerY = processorRef.hasLoadedSample() ? 46.0f : 30.0f;
     g.setColour (cardBorderColour.withAlpha (0.18f));
-    g.drawLine (topDivider.getX(), topDivider.getY() + 30.0f, topDivider.getRight(), topDivider.getY() + 30.0f, 0.8f);
+    g.drawLine (topDivider.getX(), topDivider.getY() + dividerY, topDivider.getRight(), topDivider.getY() + dividerY, 0.8f);
 
-    // Length info in the bottom-right corner of the sample canvas.
+    // Root key and length info in the bottom-right corner of the sample canvas.
     if (processorRef.hasLoadedSample())
     {
         const auto lengthSeconds = processorRef.getLoadedSampleLengthSeconds();
         const auto lengthText = juce::String (lengthSeconds, 2) + " s";
 
-        auto lengthArea = sampleZone.reduced (18.0f, 16.0f);
-        lengthArea = lengthArea.removeFromBottom (18.0f).removeFromRight (120.0f);
+        auto infoArea = sampleZone.reduced (18.0f, 16.0f).removeFromBottom (18.0f);
+        auto lengthArea = infoArea.removeFromRight (80.0f);
 
         g.setFont (juce::Font (juce::FontOptions (13.0f, juce::Font::plain)));
         g.setColour (textSecondary.withAlpha (0.75f));
@@ -1171,58 +1197,87 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 
 void AudioPluginAudioProcessorEditor::resized()
 {
-    auto bounds = getLocalBounds().reduced (28, 22);
+    constexpr int outerMargin = 28;
+    constexpr int titleH = 32;
+    constexpr int presetBarH = 26;
+    constexpr int tabsH = 26;
+    constexpr int controlsH = 206;
+    
+    auto bounds = getLocalBounds().reduced (outerMargin, 22);
 
-    titleLabel.setBounds (bounds.removeFromTop (32));
+    // Top → down flow
+    titleLabel.setBounds (bounds.removeFromTop (titleH));
     bounds.removeFromTop (4);
 
-    // Modern inline preset bar (centered below title)
-    auto presetBarZone = bounds.removeFromTop (26);
+    // Preset bar - symmetric layout
+    auto presetBar = bounds.removeFromTop (presetBarH);
     bounds.removeFromTop (8);
-    
-    auto presetBarArea = presetBarZone.withSizeKeepingCentre (500, 26);
-    
-    constexpr int presetButtonW = 32;
-    constexpr int presetSaveW = 50;
-    constexpr int presetMenuW = 32;
-    constexpr int presetGap = 6;
-    
-    auto prevBtn = presetBarArea.removeFromLeft (presetButtonW);
-    presetBarArea.removeFromLeft (presetGap);
-    auto nextBtn = presetBarArea.removeFromLeft (presetButtonW);
-    presetBarArea.removeFromLeft (presetGap);
-    auto menuBtn = presetBarArea.removeFromRight (presetMenuW);
-    presetBarArea.removeFromRight (presetGap);
-    auto saveBtn = presetBarArea.removeFromRight (presetSaveW);
-    presetBarArea.removeFromRight (presetGap);
-    
-    presetPrevButton.setBounds (prevBtn);
-    presetNextButton.setBounds (nextBtn);
-    presetNameLabel.setBounds (presetBarArea);
-    presetSaveButton.setBounds (saveBtn);
-    presetMenuButton.setBounds (menuBtn);
+    {
+        constexpr int presetButtonW = 32;
+        constexpr int presetSaveW = 50;
+        constexpr int presetMenuW = 32;
+        constexpr int presetGap = 6;
+        
+        presetPrevButton.setBounds (presetBar.removeFromLeft (presetButtonW));
+        presetBar.removeFromLeft (presetGap);
+        presetNextButton.setBounds (presetBar.removeFromLeft (presetButtonW));
+        presetBar.removeFromLeft (presetGap);
+        
+        presetMenuButton.setBounds (presetBar.removeFromRight (presetMenuW));
+        presetBar.removeFromRight (presetGap);
+        presetSaveButton.setBounds (presetBar.removeFromRight (presetSaveW));
+        presetBar.removeFromRight (presetGap);
+        
+        presetNameLabel.setBounds (presetBar);
+    }
 
-    topTabsZone = bounds.removeFromTop (26);
+    // Tabs - full width, left-aligned
+    topTabsZone = bounds.removeFromTop (tabsH);
     bounds.removeFromTop (12);
-    
-    auto tabs = topTabsZone.withSizeKeepingCentre (330, 24);
-    auto sampleTab = tabs.removeFromLeft (100);
-    tabs.removeFromLeft (10);
-    auto modulationTab = tabs.removeFromLeft (120);
-    tabs.removeFromLeft (10);
-    auto settingsTab = tabs.removeFromLeft (90);
-    samplePageButton.setBounds (sampleTab);
-    modulationPageButton.setBounds (modulationTab);
-    settingsPageButton.setBounds (settingsTab);
+    {
+        auto tabsRow = topTabsZone;
+        
+        samplePageButton.setBounds (tabsRow.removeFromLeft (100));
+        tabsRow.removeFromLeft (12);
+        modulationPageButton.setBounds (tabsRow.removeFromLeft (120));
+        tabsRow.removeFromLeft (12);
+        settingsPageButton.setBounds (tabsRow.removeFromLeft (90));
+    }
 
-    // Bottom modules area
-    constexpr int modulesHeight = 206;
+    // Settings page
     if (currentPage == Page::settings)
     {
         pageContentZone = bounds;
         sampleDropZone = {};
         controlsZone = {};
         sampleHintLabel.setBounds ({});
+        rootKeyCombo.setBounds ({});
+        
+        positionSlider.setBounds ({});
+        spraySlider.setBounds ({});
+        grainSizeSlider.setBounds ({});
+        densitySlider.setBounds ({});
+        densitySyncSlider.setBounds ({});
+        densityRateSlider.setBounds ({});
+        shapeSlider.setBounds ({});
+        pitchSlider.setBounds ({});
+        spreadSlider.setBounds ({});
+        gainSlider.setBounds ({});
+        
+        positionLabel.setBounds ({});
+        sprayLabel.setBounds ({});
+        grainSizeLabel.setBounds ({});
+        densityLabel.setBounds ({});
+        densityRateLabel.setBounds ({});
+        shapeLabel.setBounds ({});
+        pitchLabel.setBounds ({});
+        spreadLabel.setBounds ({});
+        gainLabel.setBounds ({});
+        
+        densitySyncButton.setBounds ({});
+        densityTripletButton.setBounds ({});
+        densityDottedButton.setBounds ({});
+        
         lfo1SourceButton.setBounds ({});
         lfo1RateSlider.setBounds ({});
         lfo1DepthSlider.setBounds ({});
@@ -1236,174 +1291,185 @@ void AudioPluginAudioProcessorEditor::resized()
         auto content = pageContentZone.reduced (32, 28);
         content.removeFromTop (64);
 
-        constexpr int rowHeight = 54;
-        auto row1 = content.removeFromTop (rowHeight);
-        auto row2 = content.removeFromTop (rowHeight);
-        auto row3 = content.removeFromTop (rowHeight);
-        auto row4 = content.removeFromTop (rowHeight);
+        constexpr int rowH = 54;
+        auto row1 = content.removeFromTop (rowH);
+        auto row2 = content.removeFromTop (rowH);
+        auto row3 = content.removeFromTop (rowH);
+        auto row4 = content.removeFromTop (rowH);
 
-        auto controlBoundsForRow = [] (juce::Rectangle<int> row, int width, int height)
-        {
-            auto right = row.removeFromRight (132);
-            return right.withSizeKeepingCentre (width, height);
-        };
-
-        trueStereoButton.setBounds (controlBoundsForRow (row1, 22, 22));
-        softClipButton.setBounds (controlBoundsForRow (row2, 22, 22));
-        voicesValueLabel.setBounds (controlBoundsForRow (row3, 92, 34));
-        interpolationQualityCombo.setBounds (controlBoundsForRow (row4, 180, 28));
+        trueStereoButton.setBounds (row1.removeFromRight (132));
+        softClipButton.setBounds (row2.removeFromRight (132));
+        voicesValueLabel.setBounds (row3.removeFromRight (132));
+        interpolationQualityCombo.setBounds (row4.removeFromRight (180));
         maxVoicesSlider.setBounds ({});
         return;
     }
 
-    auto modulesArea = bounds.removeFromBottom (modulesHeight);
+    // Controls at bottom
+    auto controlsArea = bounds.removeFromBottom (controlsH);
     bounds.removeFromBottom (14);
 
     pageContentZone = bounds;
     sampleDropZone = bounds;
-    auto dropZoneContent = sampleDropZone.reduced (26, 20);
-    sampleHintLabel.setBounds (dropZoneContent.removeFromTop (30));
+    
+    // Sample page header
+    if (processorRef.hasLoadedSample() && currentPage == Page::sample)
+    {
+        auto header = sampleDropZone.reduced (20, 16);
+        auto nameRow = header.removeFromTop (16);
+        nameRow.removeFromLeft (8);
+        sampleHintLabel.setBounds (nameRow);
+        
+        header.removeFromTop (4);
+        auto infoBar = header.removeFromTop (24);
+        infoBar.removeFromLeft (8);
+        
+        rootKeyCombo.setBounds (infoBar.removeFromLeft (68).reduced (0, 4));
+    }
+    else
+    {
+        auto dropContent = sampleDropZone.reduced (24, 20);
+        sampleHintLabel.setBounds (dropContent.removeFromTop (32));
+        rootKeyCombo.setBounds ({});
+    }
 
-    controlsZone = modulesArea;
+    controlsZone = controlsArea;
 
-    auto strip = controlsZone.reduced (18, 14);
+    // Controls strip
+    auto strip = controlsArea.reduced (18, 14);
     auto headerRow = strip.removeFromTop (20);
     strip.removeFromTop (6);
     auto labelRow = strip.removeFromTop (16);
     auto knobRow = strip.removeFromTop (96);
     auto buttonRow = strip.removeFromTop (22);
 
-    constexpr int totalSlots = 8;
+    // 8 slots flow
     constexpr int slotGap = 10;
-    const int totalGap = slotGap * (totalSlots - 1);
-    const int slotWBase = juce::jmax (1, (knobRow.getWidth() - totalGap) / totalSlots);
-    const int remainder = juce::jmax (0, (knobRow.getWidth() - totalGap) - slotWBase * totalSlots);
-    const int knobSize = juce::jlimit (62, 86, slotWBase - 6);
+    const int slotW = (knobRow.getWidth() - slotGap * 7) / 8;
+    const int knobSize = juce::jlimit (62, 86, slotW - 6);
 
-    auto slotAt = [&] (const juce::Rectangle<int>& row, int index) -> juce::Rectangle<int>
+    auto placeKnob = [&] (juce::Rectangle<int>& labelRowRef, juce::Rectangle<int>& knobRowRef,
+                          juce::Slider& slider, juce::Label& label, bool isPrimary)
     {
-        int x = row.getX();
-        for (int i = 0; i < index; ++i)
-        {
-            const int w = slotWBase + (i < remainder ? 1 : 0);
-            x += w + slotGap;
-        }
-        const int w = slotWBase + (index < remainder ? 1 : 0);
-        return { x, row.getY(), w, row.getHeight() };
-    };
-
-    auto placeKnob = [&] (int index, juce::Slider& slider, juce::Label& label, bool isPrimary = false)
-    {
-        label.setBounds (slotAt (labelRow, index));
-
-        auto slot = slotAt (knobRow, index).reduced (2, 0);
-        const int effectiveKnobSize = isPrimary ? 90 : knobSize;
-        slider.setBounds (slot.withSizeKeepingCentre (effectiveKnobSize, effectiveKnobSize));
+        label.setBounds (labelRowRef.removeFromLeft (slotW));
+        labelRowRef.removeFromLeft (slotGap);
         
-        // Initialize or update animation state
+        auto slot = knobRowRef.removeFromLeft (slotW);
+        knobRowRef.removeFromLeft (slotGap);
+        
+        slider.setBounds (slot);
+        
         if (knobAnimationStates.find (&slider) == knobAnimationStates.end())
             knobAnimationStates[&slider] = KnobAnimationState();
         knobAnimationStates[&slider].isPrimary = isPrimary;
-        
-        // Set isPrimary property for LookAndFeel to access
         slider.getProperties().set ("isPrimary", isPrimary);
     };
 
-    // Slots: Source (0..1), Grain (2..4), Output (5..7)
-    // Primary controls: Position (0), Grain Size (2), Density (3)
-    placeKnob (0, positionSlider, positionLabel, true);
-    placeKnob (1, spraySlider, sprayLabel, false);
-    placeKnob (2, grainSizeSlider, grainSizeLabel, true);
-    placeKnob (3, densitySlider, densityLabel, true);
-    placeKnob (3, densitySyncSlider, densitySyncLabel, true);
-    placeKnob (3, densityRateSlider, densityRateLabel, true);
-    placeKnob (4, shapeSlider, shapeLabel, false);
-    placeKnob (5, pitchSlider, pitchLabel, false);
-    placeKnob (6, spreadSlider, spreadLabel, false);
-    placeKnob (7, gainSlider, gainLabel, false);
+    auto labelRowCopy = labelRow;
+    auto knobRowCopy = knobRow;
+    
+    placeKnob (labelRowCopy, knobRowCopy, positionSlider, positionLabel, true);
+    placeKnob (labelRowCopy, knobRowCopy, spraySlider, sprayLabel, false);
+    placeKnob (labelRowCopy, knobRowCopy, grainSizeSlider, grainSizeLabel, true);
+    
+    auto densityLabelSlot = labelRowCopy.removeFromLeft (slotW);
+    labelRowCopy.removeFromLeft (slotGap);
+    auto densityKnobSlot = knobRowCopy.removeFromLeft (slotW);
+    knobRowCopy.removeFromLeft (slotGap);
+    
+    densityLabel.setBounds (densityLabelSlot);
+    densitySyncLabel.setBounds (densityLabelSlot);
+    densityRateLabel.setBounds (densityLabelSlot);
+    
+    densitySlider.setBounds (densityKnobSlot);
+    densitySyncSlider.setBounds (densityKnobSlot);
+    densityRateSlider.setBounds (densityKnobSlot);
+    
+    if (knobAnimationStates.find (&densitySlider) == knobAnimationStates.end())
+        knobAnimationStates[&densitySlider] = KnobAnimationState();
+    knobAnimationStates[&densitySlider].isPrimary = true;
+    densitySlider.getProperties().set ("isPrimary", true);
+    
+    if (knobAnimationStates.find (&densitySyncSlider) == knobAnimationStates.end())
+        knobAnimationStates[&densitySyncSlider] = KnobAnimationState();
+    knobAnimationStates[&densitySyncSlider].isPrimary = true;
+    densitySyncSlider.getProperties().set ("isPrimary", true);
+    
+    if (knobAnimationStates.find (&densityRateSlider) == knobAnimationStates.end())
+        knobAnimationStates[&densityRateSlider] = KnobAnimationState();
+    knobAnimationStates[&densityRateSlider].isPrimary = true;
+    densityRateSlider.getProperties().set ("isPrimary", true);
+    
+    placeKnob (labelRowCopy, knobRowCopy, shapeSlider, shapeLabel, false);
+    placeKnob (labelRowCopy, knobRowCopy, pitchSlider, pitchLabel, false);
+    placeKnob (labelRowCopy, knobRowCopy, spreadSlider, spreadLabel, false);
+    placeKnob (labelRowCopy, knobRowCopy, gainSlider, gainLabel, false);
 
-    sourceHeaderZone = headerRow.withX (slotAt (headerRow, 0).getX())
-                             .withRight (slotAt (headerRow, 1).getRight());
-    grainHeaderZone = headerRow.withX (slotAt (headerRow, 2).getX())
-                            .withRight (slotAt (headerRow, 4).getRight());
-    outputHeaderZone = headerRow.withX (slotAt (headerRow, 5).getX())
-                             .withRight (slotAt (headerRow, 7).getRight());
+    // Header zones
+    auto headerCopy = headerRow;
+    sourceHeaderZone = headerCopy.removeFromLeft (slotW * 2 + slotGap);
+    headerCopy.removeFromLeft (slotGap);
+    grainHeaderZone = headerCopy.removeFromLeft (slotW * 3 + slotGap * 2);
+    headerCopy.removeFromLeft (slotGap);
+    outputHeaderZone = headerCopy;
 
-    // Density controls (under the density slot): mode toggle + modifiers.
+    // Density buttons
     {
-        auto area = slotAt (buttonRow, 3).reduced (2, 2);
+        auto buttonCopy = buttonRow;
+        buttonCopy.removeFromLeft (slotW * 3 + slotGap * 3);
+        auto densityButtonArea = buttonCopy.removeFromLeft (slotW).reduced (2, 2);
 
         constexpr int chipH = 18;
-        constexpr int gap = 6;
-        constexpr int modeChipW = 50;
-        constexpr int modifierChipW = 38;
+        constexpr int chipGap = 6;
+        constexpr int modeW = 50;
+        constexpr int modW = 38;
 
         if (densitySyncButton.getToggleState())
         {
-            const int totalW = modeChipW + modifierChipW * 2 + gap * 2;
-            auto row = area.withSizeKeepingCentre (totalW, chipH);
-
-            auto mode = row.removeFromLeft (modeChipW);
-            densitySyncButton.setBounds (mode);
-            row.removeFromLeft (gap);
-
-            auto trip = row.removeFromLeft (modifierChipW);
-            densityTripletButton.setBounds (trip);
-            row.removeFromLeft (gap);
-
-            auto dot = row.removeFromLeft (modifierChipW);
-            densityDottedButton.setBounds (dot);
+            densitySyncButton.setBounds (densityButtonArea.removeFromLeft (modeW));
+            densityButtonArea.removeFromLeft (chipGap);
+            densityTripletButton.setBounds (densityButtonArea.removeFromLeft (modW));
+            densityButtonArea.removeFromLeft (chipGap);
+            densityDottedButton.setBounds (densityButtonArea.removeFromLeft (modW));
         }
         else
         {
-            densitySyncButton.setBounds (area.withSizeKeepingCentre (modeChipW, chipH));
+            densitySyncButton.setBounds (densityButtonArea.removeFromLeft (modeW));
             densityTripletButton.setBounds ({});
             densityDottedButton.setBounds ({});
         }
     }
 
-    // Settings panel layout.
-    {
-        trueStereoButton.setBounds ({});
-        softClipButton.setBounds ({});
-        maxVoicesSlider.setBounds ({});
-        voicesValueLabel.setBounds ({});
-    }
-
+    // Modulation page
     if (currentPage == Page::modulation)
     {
         auto content = pageContentZone.reduced (32, 28);
-        auto heading = content.removeFromTop (26);
-        auto subtitle = content.removeFromTop (18);
-        juce::ignoreUnused (heading, subtitle);
-        content.removeFromTop (20);
+        content.removeFromTop (24);
+        content.removeFromTop (16);
+        content.removeFromTop (24);
 
-        auto left = content.removeFromLeft (juce::jmin (320, static_cast<int> (content.getWidth() * 0.46f)));
-        auto right = content.reduced (16, 0);
+        auto leftCol = content.removeFromLeft (320);
+        content.removeFromLeft (16);
 
-        auto topChips = right.removeFromTop (26);
-        lfo1SourceButton.setBounds (topChips.removeFromLeft (68));
-        right.removeFromTop (18);
+        lfo1SourceButton.setBounds (content.removeFromTop (24).removeFromLeft (68));
+        content.removeFromTop (16);
 
-        auto knobsRow = right.removeFromTop (132);
-        constexpr int gap = 10;
-        constexpr int count = 3;
-        const int slotWidth = (knobsRow.getWidth() - gap * (count - 1)) / count;
-        const int modKnobSize = juce::jlimit (62, 84, slotWidth - 10);
+        auto modKnobRow = content.removeFromTop (132);
+        constexpr int modGap = 12;
+        const int modSlotW = (modKnobRow.getWidth() - modGap * 2) / 3;
+        const int modKnobSize = juce::jlimit (62, 84, modSlotW - 12);
 
-        auto placeModKnob = [&] (int index, juce::Slider& slider, juce::Label& label)
+        auto placeModKnob = [&] (juce::Rectangle<int>& row, juce::Slider& slider, juce::Label& label)
         {
-            auto slot = juce::Rectangle<int> (knobsRow.getX() + index * (slotWidth + gap),
-                                              knobsRow.getY(),
-                                              slotWidth,
-                                              knobsRow.getHeight());
+            auto slot = row.removeFromLeft (modSlotW);
+            row.removeFromLeft (modGap);
             label.setBounds (slot.removeFromTop (16));
-            slider.setBounds (slot.withSizeKeepingCentre (modKnobSize, modKnobSize));
+            slider.setBounds (slot);
         };
 
-        placeModKnob (0, lfo1RateSlider, lfo1RateLabel);
-        placeModKnob (1, lfo1DepthSlider, lfo1DepthLabel);
-        placeModKnob (2, lfo1ShapeSlider, lfo1ShapeLabel);
+        placeModKnob (modKnobRow, lfo1RateSlider, lfo1RateLabel);
+        placeModKnob (modKnobRow, lfo1DepthSlider, lfo1DepthLabel);
+        placeModKnob (modKnobRow, lfo1ShapeSlider, lfo1ShapeLabel);
     }
     else
     {
@@ -1437,6 +1503,7 @@ void AudioPluginAudioProcessorEditor::updatePageVisibility()
     const auto onWorkPage = currentPage == Page::sample || currentPage == Page::modulation;
 
     sampleHintLabel.setVisible (currentPage == Page::sample);
+    rootKeyCombo.setVisible (currentPage == Page::sample && processorRef.hasLoadedSample());
 
     positionSlider.setVisible (onWorkPage);
     spraySlider.setVisible (onWorkPage);
@@ -1762,7 +1829,8 @@ void AudioPluginAudioProcessorEditor::updateSampleStatus()
 juce::Rectangle<float> AudioPluginAudioProcessorEditor::getWaveformArea() const
 {
     auto waveformArea = sampleDropZone.toFloat().reduced (18.0f, 26.0f);
-    waveformArea.removeFromTop (38.0f);
+    const auto headerHeight = processorRef.hasLoadedSample() ? 46.0f : 38.0f;
+    waveformArea.removeFromTop (headerHeight);
     return waveformArea;
 }
 
