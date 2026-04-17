@@ -6,32 +6,18 @@
 void GranularEngine::rebuildEnvelopeTables()
 {
     // === ENVELOPE TABLE GENERATION ===
-    // Pre-compute 4 envelope shapes to avoid expensive math in audio thread.
-    // Tables are evaluated over phase in [0..1]. Shape morphing blends between these types.
+    // Pre-compute 4 grain-safe windows derived from shared shape family:
+    // sine <> saw <> triangle <> square. Each one gets an edge fade so grains
+    // still begin/end at zero and stay click-safe.
     
     for (int i = 0; i < envelopeTableSize; ++i)
     {
         const auto idx = static_cast<size_t> (i);
         const auto phase = static_cast<float> (i) / static_cast<float> (envelopeTableSize - 1);
-
-        // 0: Triangle - Linear attack/decay, simple and efficient
-        envelopeTables[0][idx] = 1.0f - std::abs ((phase * 2.0f) - 1.0f);
-
-        // 1: Hann - Smooth cosine window, classic granular choice
-        envelopeTables[1][idx] = 0.5f - 0.5f * std::cos (juce::MathConstants<float>::twoPi * phase);
-
-        // 2: Gaussian * Hann - Bell curve for smooth, natural grains
-        {
-            const auto hann = envelopeTables[1][idx];
-            const auto gaussianDistance = (phase - 0.5f) / 0.22f;
-            const auto gaussian = std::exp (-0.5f * gaussianDistance * gaussianDistance);
-            envelopeTables[2][idx] = gaussian * hann;
-        }
-
-        // 3: Exponential - Asymmetric shape for percussive grains
-        envelopeTables[3][idx] = phase < 0.5f
-            ? std::pow (juce::jlimit (0.0f, 1.0f, phase * 2.0f), 1.6f)
-            : std::pow (juce::jlimit (0.0f, 1.0f, (1.0f - phase) * 2.0f), 3.2f);
+        envelopeTables[0][idx] = SitoDSP::evaluateGrainShapeWindow (phase, 0.0f);
+        envelopeTables[1][idx] = SitoDSP::evaluateGrainShapeWindow (phase, 1.0f);
+        envelopeTables[2][idx] = SitoDSP::evaluateGrainShapeWindow (phase, 2.0f);
+        envelopeTables[3][idx] = SitoDSP::evaluateGrainShapeWindow (phase, 3.0f);
     }
 }
 

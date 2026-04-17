@@ -39,4 +39,29 @@ float cubicInterpolate (float y0, float y1, float y2, float y3, float mu) noexce
     return a0 * mu * mu2 + a1 * mu2 + a2 * mu + a3;
 }
 
+float evaluateShapeWaveform (float phase, float shape) noexcept
+{
+    const auto wrapped = phase - std::floor (phase);
+    const auto sine = std::sin (wrapped * juce::MathConstants<float>::twoPi);
+    const auto risingSaw = (wrapped * 2.0f) - 1.0f;
+    const auto triangle = 1.0f - 4.0f * std::abs (wrapped - 0.5f);
+    const auto square = wrapped < 0.5f ? 1.0f : -1.0f;
+    const auto morph = juce::jlimit (0.0f, 100.0f, shape) * 0.03f;
+    const auto leftIndex = juce::jlimit (0, 3, static_cast<int> (std::floor (morph)));
+    const auto rightIndex = juce::jlimit (0, 3, leftIndex + 1);
+    const auto blend = morph - static_cast<float> (leftIndex);
+    const float shapes[] { sine, risingSaw, triangle, square };
+    return juce::jmap (blend, shapes[leftIndex], shapes[rightIndex]);
+}
+
+float evaluateGrainShapeWindow (float phase, float shape) noexcept
+{
+    const auto wrapped = juce::jlimit (0.0f, 1.0f, phase);
+    const auto waveformShape = juce::jlimit (0.0f, 3.0f, shape) * (100.0f / 3.0f);
+    const auto bipolarWave = evaluateShapeWaveform (wrapped, waveformShape);
+    const auto unipolarWave = 0.5f * (bipolarWave + 1.0f);
+    const auto edgeFade = std::sin (wrapped * juce::MathConstants<float>::pi);
+    return juce::jlimit (0.0f, 1.0f, unipolarWave * edgeFade);
+}
+
 } // namespace SitoDSP

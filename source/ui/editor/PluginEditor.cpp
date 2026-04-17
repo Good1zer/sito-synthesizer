@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "dsp/DSPUtils.h"
 
 #include <cmath>
 
@@ -144,6 +145,18 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     configureKnob (lfo1ShapeSlider, lfo1ShapeLabel, "Shape");
     configureKnob (lfo1AmountSlider, lfo1AmountLabel, "Amount");
     lfo1AmountSlider.setDoubleClickReturnValue (true, 0.0);
+
+    auto shapeTextFromValue = [] (double v) -> juce::String
+    {
+        const auto clamped = juce::jlimit (0.0, 100.0, v);
+        if (clamped < 33.0) return "Sine > Saw";
+        if (clamped < 66.0) return "Saw > Triangle";
+        if (clamped < 100.0) return "Triangle > Square";
+        return "Square";
+    };
+
+    shapeSlider.textFromValueFunction = shapeTextFromValue;
+    lfo1ShapeSlider.textFromValueFunction = shapeTextFromValue;
 
     auto& params = processorRef.getParameters();
     positionAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::position, positionSlider);
@@ -1715,17 +1728,7 @@ float AudioPluginAudioProcessorEditor::getLfoPreviewValue() const noexcept
 
 float AudioPluginAudioProcessorEditor::evaluateLfoPreview (float phase, float shape) noexcept
 {
-    const auto wrapped = phase - std::floor (phase);
-    const auto sine = std::sin (wrapped * juce::MathConstants<float>::twoPi);
-    const auto triangle = 1.0f - 4.0f * std::abs (wrapped - 0.5f);
-    const auto risingSaw = (wrapped * 2.0f) - 1.0f;
-    const auto square = wrapped < 0.5f ? 1.0f : -1.0f;
-    const auto morph = juce::jlimit (0.0f, 100.0f, shape) * 0.03f;
-    const auto leftIndex = juce::jlimit (0, 3, static_cast<int> (std::floor (morph)));
-    const auto rightIndex = juce::jlimit (0, 3, leftIndex + 1);
-    const auto blend = morph - static_cast<float> (leftIndex);
-    const float shapes[] { sine, triangle, risingSaw, square };
-    return juce::jmap (blend, shapes[leftIndex], shapes[rightIndex]);
+    return SitoDSP::evaluateShapeWaveform (phase, shape);
 }
 
 void AudioPluginAudioProcessorEditor::refreshModulationSliderDecorations()

@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "ui/editor/PluginEditor.h"
+#include "dsp/DSPUtils.h"
 
 #include <cmath>
 
@@ -44,21 +45,6 @@ constexpr std::array<const char*, 8> modulationTargets
     ParameterIDs::spread,
     ParameterIDs::gain
 };
-
-float evaluateLfoShape (float phase, float shape) noexcept
-{
-    const auto wrapped = phase - std::floor (phase);
-    const auto sine = std::sin (wrapped * juce::MathConstants<float>::twoPi);
-    const auto triangle = 1.0f - 4.0f * std::abs (wrapped - 0.5f);
-    const auto risingSaw = (wrapped * 2.0f) - 1.0f;
-    const auto square = wrapped < 0.5f ? 1.0f : -1.0f;
-    const auto morph = juce::jlimit (0.0f, 100.0f, shape) * 0.03f;
-    const auto leftIndex = juce::jlimit (0, 3, static_cast<int> (std::floor (morph)));
-    const auto rightIndex = juce::jlimit (0, 3, leftIndex + 1);
-    const auto blend = morph - static_cast<float> (leftIndex);
-    const float shapes[] { sine, triangle, risingSaw, square };
-    return juce::jmap (blend, shapes[leftIndex], shapes[rightIndex]);
-}
 
 }
 
@@ -648,7 +634,8 @@ void AudioPluginAudioProcessor::restoreModulationAssignmentsFromState()
 
 float AudioPluginAudioProcessor::evaluateLfo1Sample() const noexcept
 {
-    return evaluateLfoShape (lfo1Phase.load (std::memory_order_acquire), lfo1ShapeParam != nullptr ? lfo1ShapeParam->load() : 0.0f);
+    return SitoDSP::evaluateShapeWaveform (lfo1Phase.load (std::memory_order_acquire),
+                                           lfo1ShapeParam != nullptr ? lfo1ShapeParam->load() : 0.0f);
 }
 
 void AudioPluginAudioProcessor::refreshSampleInfoCache()

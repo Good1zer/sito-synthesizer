@@ -70,5 +70,25 @@ namespace SitoDSP
     {
         return std::pow (2.0f, semitones / 12.0f);
     }
+
+    /**
+     * Evaluate bipolar waveform morph: sine <> saw <> triangle <> square.
+     * Shape input is normalized to the plugin's 0..100 UI range.
+     *
+     * @param phase Wrapped or unwrapped phase, where 1.0 = one full cycle
+     * @param shape Morph position in range 0..100
+     * @return Bipolar waveform value in range about -1..1
+     */
+    float evaluateShapeWaveform (float phase, float shape) noexcept;
+
+    /**
+     * Grain-safe unipolar window derived from the same waveform family.
+     * Applies an edge fade so grains still start/end at zero and avoid clicks.
+     *
+     * @param phase Normalized grain phase 0..1
+     * @param shape Morph position in range 0..3
+     * @return Unipolar envelope value in range 0..1
+     */
+    float evaluateGrainShapeWindow (float phase, float shape) noexcept;
     
 } // namespace SitoDSP

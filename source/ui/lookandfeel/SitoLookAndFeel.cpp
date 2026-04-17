@@ -1,4 +1,5 @@
 #include "SitoLookAndFeel.h"
+#include "dsp/DSPUtils.h"
 #include <cmath>
 
 SitoLookAndFeel::SitoLookAndFeel()
@@ -128,11 +129,6 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
     // Special visualization for shape parameter
     if (slider.getName() == "shape")
     {
-        const auto shapeMorph = (juce::jlimit (0.0f, 100.0f, static_cast<float> (slider.getValue())) / 100.0f) * 3.0f;
-        const auto leftIndex = juce::jlimit (0, 3, static_cast<int> (std::floor (shapeMorph)));
-        const auto rightIndex = juce::jlimit (0, 3, leftIndex + 1);
-        const auto blend = shapeMorph - static_cast<float> (leftIndex);
-
         auto curveBounds = knobBounds.reduced (radius * 0.52f, radius * 0.62f);
         juce::Path shapePath;
 
@@ -142,16 +138,7 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
         for (int i = 0; i < 48; ++i)
         {
             const auto phase = static_cast<float> (i) / 47.0f;
-            const auto triangle = 1.0f - std::abs ((phase * 2.0f) - 1.0f);
-            const auto hann = 0.5f - 0.5f * std::cos (juce::MathConstants<float>::twoPi * phase);
-            const auto gaussianDistance = (phase - 0.5f) / 0.22f;
-            const auto gaussian = std::exp (-0.5f * gaussianDistance * gaussianDistance);
-            const auto exponential = phase < 0.5f
-                ? std::pow (juce::jlimit (0.0f, 1.0f, phase * 2.0f), 1.6f)
-                : std::pow (juce::jlimit (0.0f, 1.0f, (1.0f - phase) * 2.0f), 3.2f);
-
-            const float shapes[] { triangle, hann, gaussian, exponential };
-            const auto shape = juce::jmap (blend, shapes[leftIndex], shapes[rightIndex]);
+            const auto shape = SitoDSP::evaluateGrainShapeWindow (phase, (juce::jlimit (0.0f, 100.0f, static_cast<float> (slider.getValue())) / 100.0f) * 3.0f);
 
             const auto px = curveBounds.getX() + curveBounds.getWidth() * phase;
             const auto py = curveBounds.getBottom() - curveBounds.getHeight() * shape;
