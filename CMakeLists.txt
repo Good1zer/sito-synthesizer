@@ -85,6 +85,7 @@ target_compile_definitions(SharedCode
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
+    SITO_ENABLE_INSPECTOR=$<IF:$<CONFIG:Debug>,1,0>
     CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
     VERSION="${CURRENT_VERSION}"
     PRODUCT_NAME_WITHOUT_VERSION="SITO"
@@ -96,7 +97,7 @@ target_compile_definitions(SharedCode
 target_link_libraries(SharedCode
     INTERFACE
     Assets
-    melatonin_inspector
+    $<$<CONFIG:Debug>:melatonin_inspector>
     juce_audio_utils
     juce_audio_processors
     juce_dsp

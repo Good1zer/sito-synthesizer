@@ -7,6 +7,10 @@
 #include <array>
 #include <limits>
 
+#if SITO_ENABLE_INSPECTOR
+#include "melatonin_inspector/melatonin_inspector.h"
+#endif
+
 //==============================================================================
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               public juce::FileDragAndDropTarget,
@@ -93,6 +97,7 @@ private:
     float getLfoPreviewValue() const noexcept;
     static float evaluateLfoPreview (float phase, float shape) noexcept;
     void refreshModulationSliderDecorations();
+    void toggleInspector();
 
     AudioPluginAudioProcessor& processorRef;
     SitoLookAndFeel lookAndFeel;
@@ -224,6 +229,10 @@ private:
     AssignmentWorkflowState assignmentWorkflowState;
     
     std::unique_ptr<PresetBrowser> presetBrowser;
+
+#if SITO_ENABLE_INSPECTOR
+    std::unique_ptr<melatonin::Inspector> inspector;
+#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessorEditor)
 };

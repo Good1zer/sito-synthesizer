@@ -2324,6 +2324,20 @@ void AudioPluginAudioProcessorEditor::mouseExit (const juce::MouseEvent& e)
 
 bool AudioPluginAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 {
+#if SITO_ENABLE_INSPECTOR
+#if JUCE_WINDOWS
+    const auto inspectorToggleModifierDown = key.getModifiers().isCtrlDown();
+#else
+    const auto inspectorToggleModifierDown = key.getModifiers().isCommandDown();
+#endif
+
+    if (inspectorToggleModifierDown && (key.getTextCharacter() == 'i' || key.getTextCharacter() == 'I'))
+    {
+        toggleInspector();
+        return true;
+    }
+#endif
+
     if (key == juce::KeyPress::escapeKey)
     {
         isDraggingModulationSource = false;
@@ -2336,6 +2350,27 @@ bool AudioPluginAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
     }
 
     return false;
+}
+
+void AudioPluginAudioProcessorEditor::toggleInspector()
+{
+#if SITO_ENABLE_INSPECTOR
+    if (inspector == nullptr)
+    {
+        inspector = std::make_unique<melatonin::Inspector> (*this, false);
+        inspector->onClose = [this]()
+        {
+            inspector.reset();
+        };
+    }
+
+    const auto shouldEnableInspector = ! inspector->isVisible();
+    inspector->setVisible (true);
+    inspector->toggle (shouldEnableInspector);
+
+    if (shouldEnableInspector)
+        inspector->toFront (true);
+#endif
 }
 
 void AudioPluginAudioProcessorEditor::presetListChanged()
