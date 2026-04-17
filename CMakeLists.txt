@@ -20,7 +20,7 @@ set(PROJECT_NAME "SITO")
 set(PRODUCT_NAME "SITO")
 set(COMPANY_NAME "u95")
 set(BUNDLE_ID "com.u95.sito")
-set(FORMATS VST3)
+set(FORMATS VST3 Standalone CLAP)
 
 project(${PROJECT_NAME} VERSION ${CURRENT_VERSION})
 

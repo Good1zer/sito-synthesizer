@@ -6,6 +6,9 @@ SitoLookAndFeel::SitoLookAndFeel()
     // Set default colors for the look and feel
     setColour (juce::ResizableWindow::backgroundColourId, getBackgroundColour());
     setColour (juce::DocumentWindow::backgroundColourId, getBackgroundColour());
+    setColour (juce::ComboBox::textColourId, getTextPrimaryColour());
+    setColour (juce::ComboBox::arrowColourId, getTextSecondaryColour());
+    setColour (juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
 }
 
 void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
@@ -211,13 +214,14 @@ void SitoLookAndFeel::drawToggleButton (juce::Graphics& g,
     const auto isHot = shouldDrawButtonAsHighlighted || button.isMouseOverOrDragging();
     const auto kind = button.getName();
     const auto isModeChip = kind == "chip_mode";
+    const auto isModifierChip = kind == "chip_trip" || kind == "chip_dot";
     const auto isPageChip = kind.startsWith ("chip_page_");
 
     const auto enabledAlpha = button.isEnabled() ? 1.0f : 0.40f;
     
     // Enhanced styling for page tabs
     juce::Colour bg, outline, icon;
-    float corner = isModeChip ? 9.0f : getCornerRadius();
+    float corner = (isModeChip || isModifierChip) ? 9.0f : getCornerRadius();
     
     if (isPageChip)
     {
@@ -232,13 +236,13 @@ void SitoLookAndFeel::drawToggleButton (juce::Graphics& g,
     }
     else
     {
-        bg = (isModeChip && isOn ? getAccentColour().interpolatedWith (getCardColour(), 0.76f)
+        bg = ((isModeChip || isModifierChip) && isOn ? getAccentColour().interpolatedWith (getCardColour(), 0.76f)
                                  : juce::Colour (0xff1c1523))
                  .withAlpha ((isHot ? 0.88f : 0.74f) * enabledAlpha);
         outline = (isOn ? getAccentColour() : getCardBorderColour())
-                      .withAlpha ((isOn ? (isModeChip ? 0.95f : 0.72f) : (isHot ? 0.45f : 0.25f)) * enabledAlpha);
-        icon = (isOn ? (isModeChip ? getTextPrimaryColour() : getAccentGlowColour()) : getTextSecondaryColour())
-                   .withAlpha ((isOn ? 0.96f : (isHot ? 0.75f : 0.55f)) * enabledAlpha);
+                      .withAlpha ((isOn ? ((isModeChip || isModifierChip) ? 0.95f : 0.72f) : (isHot ? 0.45f : 0.25f)) * enabledAlpha);
+        icon = (isOn ? getTextPrimaryColour() : (isModifierChip ? getTextPrimaryColour() : getTextSecondaryColour()))
+                   .withAlpha ((isOn ? 0.96f : (isModifierChip ? (isHot ? 0.78f : 0.62f) : (isHot ? 0.75f : 0.55f))) * enabledAlpha);
     }
 
     g.setColour (bg);
@@ -257,9 +261,10 @@ void SitoLookAndFeel::drawToggleButton (juce::Graphics& g,
     // Chip buttons (mode selection)
     if (kind.startsWith ("chip_"))
     {
-        g.setFont (juce::Font (juce::FontOptions (isModeChip ? 12.8f : 11.3f, juce::Font::bold)));
+        const auto textArea = bounds.toNearestInt().reduced (isModifierChip ? 3 : 4, 0);
+        g.setFont (juce::Font (juce::FontOptions (isModeChip ? 12.8f : 11.4f, juce::Font::bold)));
         g.setColour (icon);
-        g.drawFittedText (button.getButtonText(), bounds.toNearestInt(), juce::Justification::centred, 1);
+        g.drawFittedText (button.getButtonText(), textArea, juce::Justification::centred, 1);
         return;
     }
 

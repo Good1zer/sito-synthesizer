@@ -104,6 +104,10 @@ private:
     juce::Rectangle<int> sampleDropZone;
     juce::Rectangle<int> controlsZone;
     juce::Rectangle<int> pageContentZone;
+    juce::Rectangle<int> sampleWaveformZone;
+    juce::Rectangle<int> sampleNameZone;
+    juce::Rectangle<int> sampleEditBarZone;
+    juce::Rectangle<int> sampleLengthZone;
     juce::Rectangle<int> sourceHeaderZone;
     juce::Rectangle<int> grainHeaderZone;
     juce::Rectangle<int> outputHeaderZone;

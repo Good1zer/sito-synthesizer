@@ -104,6 +104,13 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     sampleHintLabel.setInterceptsMouseClicks (false, false);
     addAndMakeVisible (sampleHintLabel);
 
+    rootKeyLabel.setText ("ROOT", juce::dontSendNotification);
+    rootKeyLabel.setJustificationType (juce::Justification::centredLeft);
+    rootKeyLabel.setFont (juce::Font (juce::FontOptions (11.0f, juce::Font::bold)));
+    rootKeyLabel.setColour (juce::Label::textColourId, textSecondary.withAlpha (0.82f));
+    rootKeyLabel.setInterceptsMouseClicks (false, false);
+    addAndMakeVisible (rootKeyLabel);
+
     sourceGroup.setText ("Source");
     sourceGroup.setColour (juce::GroupComponent::outlineColourId, juce::Colours::transparentBlack);
     sourceGroup.setColour (juce::GroupComponent::textColourId, textSecondary);
@@ -505,6 +512,10 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     {
         rootKeyCombo.addItem (noteNames[i], i + 1);
     }
+    rootKeyCombo.setJustificationType (juce::Justification::centredLeft);
+    rootKeyCombo.setColour (juce::ComboBox::textColourId, textPrimary);
+    rootKeyCombo.setColour (juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+    rootKeyCombo.setColour (juce::ComboBox::arrowColourId, textSecondary);
     rootKeyCombo.setTooltip ("Root key of the sample");
     rootKeyCombo.setLookAndFeel (&lookAndFeel);
     addAndMakeVisible (rootKeyCombo);
@@ -647,6 +658,8 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     {
         lastSeenSampleGeneration = sampleGeneration;
         updateSampleStatus();
+        updatePageVisibility();
+        resized();
     }
 
     const auto rateHz = juce::jlimit (0.01f, 20.0f, static_cast<float> (lfo1RateSlider.getValue()));
@@ -935,24 +948,16 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
         }
     }
 
-    // Sample info bar background (when loaded)
+    // Bottom edit bar
     if (processorRef.hasLoadedSample())
     {
-        auto header = sampleZone.reduced (20.0f, 14.0f);
-        header.removeFromTop (18.0f); // skip name
-        auto infoBarBg = header.removeFromTop (24.0f);
-        
+        const auto infoBarBg = sampleEditBarZone.toFloat();
+
         g.setColour (juce::Colour (0xff1a1a22).withAlpha (0.65f));
         g.fillRoundedRectangle (infoBarBg, 8.0f);
         g.setColour (cardBorderColour.withAlpha (0.12f));
         g.drawRoundedRectangle (infoBarBg, 8.0f, 0.6f);
     }
-
-    // Refined divider under the sample header row
-    auto topDivider = sampleZone.reduced (18.0f, 18.0f);
-    const auto dividerY = processorRef.hasLoadedSample() ? 46.0f : 30.0f;
-    g.setColour (cardBorderColour.withAlpha (0.18f));
-    g.drawLine (topDivider.getX(), topDivider.getY() + dividerY, topDivider.getRight(), topDivider.getY() + dividerY, 0.8f);
 
     // Root key and length info in the bottom-right corner of the sample canvas.
     if (processorRef.hasLoadedSample())
@@ -960,12 +965,9 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
         const auto lengthSeconds = processorRef.getLoadedSampleLengthSeconds();
         const auto lengthText = juce::String (lengthSeconds, 2) + " s";
 
-        auto infoArea = sampleZone.reduced (18.0f, 16.0f).removeFromBottom (18.0f);
-        auto lengthArea = infoArea.removeFromRight (80.0f);
-
         g.setFont (juce::Font (juce::FontOptions (13.0f, juce::Font::plain)));
         g.setColour (textSecondary.withAlpha (0.75f));
-        g.drawFittedText (lengthText, lengthArea.toNearestInt(), juce::Justification::centredRight, 1);
+        g.drawFittedText (lengthText, sampleLengthZone, juce::Justification::centredRight, 1);
     }
 
     }
@@ -1231,17 +1233,22 @@ void AudioPluginAudioProcessorEditor::resized()
         presetNameLabel.setBounds (presetBar);
     }
 
-    // Tabs - full width, left-aligned
+    // Tabs - centered cluster
     topTabsZone = bounds.removeFromTop (tabsH);
     bounds.removeFromTop (12);
     {
         auto tabsRow = topTabsZone;
-        
-        samplePageButton.setBounds (tabsRow.removeFromLeft (100));
-        tabsRow.removeFromLeft (12);
-        modulationPageButton.setBounds (tabsRow.removeFromLeft (120));
-        tabsRow.removeFromLeft (12);
-        settingsPageButton.setBounds (tabsRow.removeFromLeft (90));
+        tabsRow.removeFromLeft (tabsRow.getWidth() / 4);
+        tabsRow.removeFromRight (tabsRow.getWidth() / 3);
+
+        constexpr int tabGap = 12;
+        const auto tabW = (tabsRow.getWidth() - tabGap * 2) / 3;
+
+        samplePageButton.setBounds (tabsRow.removeFromLeft (tabW));
+        tabsRow.removeFromLeft (tabGap);
+        modulationPageButton.setBounds (tabsRow.removeFromLeft (tabW));
+        tabsRow.removeFromLeft (tabGap);
+        settingsPageButton.setBounds (tabsRow.removeFromLeft (tabW));
     }
 
     // Settings page
@@ -1249,8 +1256,13 @@ void AudioPluginAudioProcessorEditor::resized()
     {
         pageContentZone = bounds;
         sampleDropZone = {};
+        sampleWaveformZone = {};
+        sampleNameZone = {};
+        sampleEditBarZone = {};
+        sampleLengthZone = {};
         controlsZone = {};
         sampleHintLabel.setBounds ({});
+        rootKeyLabel.setBounds ({});
         rootKeyCombo.setBounds ({});
         
         positionSlider.setBounds ({});
@@ -1311,26 +1323,39 @@ void AudioPluginAudioProcessorEditor::resized()
 
     pageContentZone = bounds;
     sampleDropZone = bounds;
+    sampleWaveformZone = {};
+    sampleNameZone = {};
+    sampleEditBarZone = {};
+    sampleLengthZone = {};
     
     // Sample page header
     if (processorRef.hasLoadedSample() && currentPage == Page::sample)
     {
-        auto header = sampleDropZone.reduced (20, 16);
-        auto nameRow = header.removeFromTop (16);
+        auto content = sampleDropZone.reduced (20, 16);
+        sampleNameZone = content.removeFromTop (18);
+        auto nameRow = sampleNameZone;
         nameRow.removeFromLeft (8);
         sampleHintLabel.setBounds (nameRow);
-        
-        header.removeFromTop (4);
-        auto infoBar = header.removeFromTop (24);
-        infoBar.removeFromLeft (8);
-        
-        rootKeyCombo.setBounds (infoBar.removeFromLeft (68).reduced (0, 4));
+
+        content.removeFromTop (8);
+        sampleEditBarZone = content.removeFromBottom (32);
+        content.removeFromBottom (8);
+        sampleWaveformZone = content;
+
+        auto editBar = sampleEditBarZone.reduced (10, 4);
+        rootKeyLabel.setBounds (editBar.removeFromLeft (40));
+        editBar.removeFromLeft (8);
+        rootKeyCombo.setBounds (editBar.removeFromLeft (84));
+        sampleLengthZone = editBar.removeFromRight (76);
     }
     else
     {
         auto dropContent = sampleDropZone.reduced (24, 20);
         sampleHintLabel.setBounds (dropContent.removeFromTop (32));
+        rootKeyLabel.setBounds ({});
         rootKeyCombo.setBounds ({});
+        sampleWaveformZone = sampleDropZone.reduced (18, 26);
+        sampleWaveformZone.removeFromTop (38);
     }
 
     controlsZone = controlsArea;
@@ -1417,12 +1442,11 @@ void AudioPluginAudioProcessorEditor::resized()
     {
         auto buttonCopy = buttonRow;
         buttonCopy.removeFromLeft (slotW * 3 + slotGap * 3);
-        auto densityButtonArea = buttonCopy.removeFromLeft (slotW).reduced (2, 2);
-
-        constexpr int chipH = 18;
         constexpr int chipGap = 6;
-        constexpr int modeW = 50;
-        constexpr int modW = 38;
+        constexpr int modeW = 52;
+        constexpr int modW = 46;
+        constexpr int totalChipW = modeW + chipGap + modW + chipGap + modW;
+        auto densityButtonArea = buttonCopy.removeFromLeft (totalChipW).reduced (0, 2);
 
         if (densitySyncButton.getToggleState())
         {
@@ -1503,6 +1527,7 @@ void AudioPluginAudioProcessorEditor::updatePageVisibility()
     const auto onWorkPage = currentPage == Page::sample || currentPage == Page::modulation;
 
     sampleHintLabel.setVisible (currentPage == Page::sample);
+    rootKeyLabel.setVisible (currentPage == Page::sample && processorRef.hasLoadedSample());
     rootKeyCombo.setVisible (currentPage == Page::sample && processorRef.hasLoadedSample());
 
     positionSlider.setVisible (onWorkPage);
@@ -1808,7 +1833,10 @@ void AudioPluginAudioProcessorEditor::filesDropped (const juce::StringArray& fil
 
     if (processorRef.loadSample (juce::File (files[0])))
     {
+        lastSeenSampleGeneration = processorRef.getLoadedSampleGeneration();
         updateSampleStatus();
+        updatePageVisibility();
+        resized();
         repaint();
     }
 }
@@ -1828,9 +1856,11 @@ void AudioPluginAudioProcessorEditor::updateSampleStatus()
 
 juce::Rectangle<float> AudioPluginAudioProcessorEditor::getWaveformArea() const
 {
+    if (! sampleWaveformZone.isEmpty())
+        return sampleWaveformZone.toFloat();
+
     auto waveformArea = sampleDropZone.toFloat().reduced (18.0f, 26.0f);
-    const auto headerHeight = processorRef.hasLoadedSample() ? 46.0f : 38.0f;
-    waveformArea.removeFromTop (headerHeight);
+    waveformArea.removeFromTop (38.0f);
     return waveformArea;
 }
 
