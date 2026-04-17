@@ -220,12 +220,12 @@ AudioPluginAudioProcessor::createParameterLayout()
         juce::StringArray { "Linear", "Cubic (High Quality)" },
         ParameterDefaults::interpolationQuality));
 
-    // Root key: MIDI note 0-127 (C-2 to G8)
+    // Root key: pitch class, where 0 = C, 1 = C#, ... 11 = B.
     params.push_back (std::make_unique<juce::AudioParameterInt> (
         juce::ParameterID { ParameterIDs::rootKey, 1 },
         ParameterNames::rootKey,
         0,
-        127,
+        11,
         ParameterDefaults::rootKey));
 
     return { params.begin(), params.end() };
@@ -384,11 +384,18 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const auto grainSizeMsUsed = applyModulation (ParameterIDs::grainSizeMs, grainSizeParam->load(), 10.0f, 500.0f, 245.0f);
     densityHzUsed = applyModulation (ParameterIDs::densityHz, densityHzUsed, 0.1f, 1200.0f, 60.0f);
     
-    // Apply root key offset: convert MIDI note to semitone offset from C4 (60)
-    const auto rootKeyNote = static_cast<int> (rootKeyParam->load());
-    const auto rootKeyOffset = static_cast<float> (rootKeyNote - 60);
-    const auto pitchWithRoot = pitchParam->load() + rootKeyOffset;
-    const auto pitchSemitonesUsed = applyModulation (ParameterIDs::pitchSemitones, pitchWithRoot, -24.0f, 24.0f, 24.0f);
+    // Root key defines sample's native pitch class. Example: root = F means
+    // pressing C should transpose sample down 5 semitones, while pressing F
+    // plays it back unshifted.
+    const auto rootKeySemitone = static_cast<float> (juce::jlimit (0, 11, static_cast<int> (rootKeyParam->load())));
+    const auto pitchSemitonesUsed = applyModulation (ParameterIDs::pitchSemitones,
+                                                     pitchParam->load(),
+                                                     -24.0f,
+                                                     24.0f,
+                                                     24.0f);
+    const auto pitchWithRoot = pitchSemitonesUsed - rootKeySemitone;
+    const auto useHighQualityInterpolation = interpolationQualityParam->load() >= 0.5f
+        || std::abs (pitchWithRoot) > 0.01f;
     
     const auto shapeTypeUsed = applyModulation (ParameterIDs::shapeType, shapeTypeParam->load(), 0.0f, 100.0f, 50.0f);
 
@@ -400,11 +407,11 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                            spreadUsed,
                            grainSizeMsUsed,
                            densityHzUsed,
-                           pitchSemitonesUsed,
+                           pitchWithRoot,
                            (shapeTypeUsed / 100.0f) * 3.0f,
                            softClipEnabledParam->load() >= 0.5f,
                            trueStereoEnabledParam->load() >= 0.5f,
-                           interpolationQualityParam->load() >= 0.5f);
+                           useHighQualityInterpolation);
 
     const auto phaseDelta = static_cast<float> ((juce::jmax (0.01f, lfo1RateParam->load()) * buffer.getNumSamples())
                                                 / juce::jmax (1.0, currentSampleRate));
@@ -454,7 +461,21 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
 
     if (xmlState != nullptr && xmlState->hasTagName (parameters.state.getType()))
     {
-        parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
+        auto restoredState = juce::ValueTree::fromXml (*xmlState);
+
+        for (auto child : restoredState)
+        {
+            if (child.getProperty ("id").toString() != ParameterIDs::rootKey)
+                continue;
+
+            const auto rawRootKey = static_cast<int> (std::round (static_cast<double> (child.getProperty ("value"))));
+            const auto normalizedRootKey = juce::jlimit (0, 11, ((rawRootKey % 12) + 12) % 12);
+            child.setProperty ("value", normalizedRootKey, nullptr);
+            break;
+        }
+
+        parameters.replaceState (restoredState);
+
         ensureModulationStateTree();
         restoreModulationAssignmentsFromState();
 

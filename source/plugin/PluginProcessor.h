@@ -84,7 +84,7 @@ namespace ParameterDefaults
     static constexpr int maxVoices = 8;
     static constexpr bool trueStereoEnabled = true;
     static constexpr int interpolationQuality = 0; // 0 = Linear, 1 = Cubic (High Quality)
-    static constexpr int rootKey = 60; // C4 (MIDI note 60)
+    static constexpr int rootKey = 0; // pitch class: C
 }
 
 //==============================================================================
