@@ -162,6 +162,9 @@ private:
     juce::DrawableButton presetPrevButton { "prev", juce::DrawableButton::ImageFitted };
     juce::DrawableButton presetNextButton { "next", juce::DrawableButton::ImageFitted };
     juce::Label presetNameLabel;
+#if SITO_ENABLE_INSPECTOR
+    juce::ToggleButton inspectorButton;
+#endif
     juce::DrawableButton presetSaveButton { "save", juce::DrawableButton::ImageFitted };
     juce::DrawableButton presetMenuButton { "menu", juce::DrawableButton::ImageFitted };
     juce::ToggleButton lfo1SourceButton;

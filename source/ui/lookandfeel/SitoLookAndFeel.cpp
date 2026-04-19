@@ -129,19 +129,23 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
     // Special visualization for shape parameter
     if (slider.getName() == "shape")
     {
-        auto curveBounds = knobBounds.reduced (radius * 0.52f, radius * 0.62f);
+        auto curveBounds = knobBounds.reduced (radius * 0.50f, radius * 0.52f);
         juce::Path shapePath;
 
         juce::Graphics::ScopedSaveState state (g);
         g.reduceClipRegion (knobBounds.reduced (radius * 0.34f).toNearestInt());
 
-        for (int i = 0; i < 48; ++i)
+        const auto shapeValue = juce::jlimit (0.0f, 100.0f, static_cast<float> (slider.getValue()));
+        const auto centreY = curveBounds.getCentreY();
+        const auto amplitude = curveBounds.getHeight() * 0.46f;
+
+        for (int i = 0; i < 64; ++i)
         {
-            const auto phase = static_cast<float> (i) / 47.0f;
-            const auto shape = SitoDSP::evaluateGrainShapeWindow (phase, (juce::jlimit (0.0f, 100.0f, static_cast<float> (slider.getValue())) / 100.0f) * 3.0f);
+            const auto phase = static_cast<float> (i) / 63.0f;
+            const auto waveform = SitoDSP::evaluateShapeWaveform (phase, shapeValue);
 
             const auto px = curveBounds.getX() + curveBounds.getWidth() * phase;
-            const auto py = curveBounds.getBottom() - curveBounds.getHeight() * shape;
+            const auto py = centreY - amplitude * waveform;
 
             if (i == 0)
                 shapePath.startNewSubPath (px, py);

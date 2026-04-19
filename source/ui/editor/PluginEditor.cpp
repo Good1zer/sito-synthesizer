@@ -428,6 +428,19 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
         }
     };
     addAndMakeVisible (presetNameLabel);
+
+#if SITO_ENABLE_INSPECTOR
+    inspectorButton.setName ("chip_inspector");
+    inspectorButton.setButtonText ("INSPECT");
+    inspectorButton.setClickingTogglesState (false);
+    inspectorButton.setLookAndFeel (&lookAndFeel);
+    inspectorButton.setTooltip ("Toggle melatonin inspector");
+    inspectorButton.onClick = [this]
+    {
+        toggleInspector();
+    };
+    addAndMakeVisible (inspectorButton);
+#endif
     
     auto saveIcon = loadSVGIcon (BinaryData::save_svg, BinaryData::save_svgSize);
     auto saveIconOver = loadSVGIcon (BinaryData::save_svg, BinaryData::save_svgSize);
@@ -653,6 +666,9 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
     samplePageButton.setLookAndFeel (nullptr);
     modulationPageButton.setLookAndFeel (nullptr);
     settingsPageButton.setLookAndFeel (nullptr);
+#if SITO_ENABLE_INSPECTOR
+    inspectorButton.setLookAndFeel (nullptr);
+#endif
     densitySyncButton.setLookAndFeel (nullptr);
     densityTripletButton.setLookAndFeel (nullptr);
     densityDottedButton.setLookAndFeel (nullptr);
@@ -1231,6 +1247,7 @@ void AudioPluginAudioProcessorEditor::resized()
         constexpr int presetButtonW = 32;
         constexpr int presetSaveW = 50;
         constexpr int presetMenuW = 32;
+        constexpr int inspectorW = 92;
         constexpr int presetGap = 6;
         
         presetPrevButton.setBounds (presetBar.removeFromLeft (presetButtonW));
@@ -1242,6 +1259,10 @@ void AudioPluginAudioProcessorEditor::resized()
         presetBar.removeFromRight (presetGap);
         presetSaveButton.setBounds (presetBar.removeFromRight (presetSaveW));
         presetBar.removeFromRight (presetGap);
+#if SITO_ENABLE_INSPECTOR
+        inspectorButton.setBounds (presetBar.removeFromRight (inspectorW));
+        presetBar.removeFromRight (presetGap);
+#endif
         
         presetNameLabel.setBounds (presetBar);
     }
@@ -2393,16 +2414,26 @@ void AudioPluginAudioProcessorEditor::toggleInspector()
         inspector = std::make_unique<melatonin::Inspector> (*this, false);
         inspector->onClose = [this]()
         {
+            inspectorButton.setToggleState (false, juce::dontSendNotification);
             inspector.reset();
         };
     }
 
-    const auto shouldEnableInspector = ! inspector->isVisible();
-    inspector->setVisible (true);
-    inspector->toggle (shouldEnableInspector);
+    const auto shouldShowInspector = ! inspector->isVisible();
 
-    if (shouldEnableInspector)
+    if (shouldShowInspector)
+    {
+        inspector->setVisible (true);
+        inspector->toggle (true);
         inspector->toFront (true);
+    }
+    else
+    {
+        inspector->toggle (false);
+        inspector->setVisible (false);
+    }
+
+    inspectorButton.setToggleState (shouldShowInspector, juce::dontSendNotification);
 #endif
 }
 
