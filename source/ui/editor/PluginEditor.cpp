@@ -54,6 +54,7 @@ juce::String getAssistTextForComponent (const juce::Component* c)
     const auto name = c->getName();
     if (name == "chip_page_sample")      return "Open sample page";
     if (name == "chip_page_modulation")  return "Open modulation page";
+    if (name == "chip_page_envelope")    return "Open envelope page";
     if (name == "chip_page_settings")    return "Open settings page";
     if (name == "chip_lfo1")     return "Drag LFO 1 onto a bottom control to assign it";
     if (name == "chip_mode")   return "Switch Density between free Hz and host BPM sync";
@@ -144,6 +145,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     configureKnob (lfo1DepthSlider, lfo1DepthLabel, "Depth");
     configureKnob (lfo1ShapeSlider, lfo1ShapeLabel, "Shape");
     configureKnob (lfo1AmountSlider, lfo1AmountLabel, "Amount");
+    configureKnob (envAttackSlider, envAttackLabel, "Attack");
+    configureKnob (envHoldSlider, envHoldLabel, "Hold");
+    configureKnob (envDecaySlider, envDecayLabel, "Decay");
+    configureKnob (envSustainSlider, envSustainLabel, "Sustain");
+    configureKnob (envReleaseSlider, envReleaseLabel, "Release");
     lfo1AmountSlider.setDoubleClickReturnValue (true, 0.0);
 
     auto shapeTextFromValue = [] (double v) -> juce::String
@@ -158,6 +164,27 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     shapeSlider.textFromValueFunction = shapeTextFromValue;
     lfo1ShapeSlider.textFromValueFunction = shapeTextFromValue;
 
+    auto millisecondsText = [] (double v) -> juce::String
+    {
+        return juce::String (static_cast<int> (std::round (juce::jmax (0.0, v)))) + " ms";
+    };
+
+    auto percentText = [] (double v) -> juce::String
+    {
+        return juce::String (static_cast<int> (std::round (juce::jlimit (0.0, 1.0, v) * 100.0))) + " %";
+    };
+
+    envAttackSlider.setNumDecimalPlacesToDisplay (0);
+    envHoldSlider.setNumDecimalPlacesToDisplay (0);
+    envDecaySlider.setNumDecimalPlacesToDisplay (0);
+    envReleaseSlider.setNumDecimalPlacesToDisplay (0);
+    envSustainSlider.setNumDecimalPlacesToDisplay (0);
+    envAttackSlider.textFromValueFunction = millisecondsText;
+    envHoldSlider.textFromValueFunction = millisecondsText;
+    envDecaySlider.textFromValueFunction = millisecondsText;
+    envReleaseSlider.textFromValueFunction = millisecondsText;
+    envSustainSlider.textFromValueFunction = percentText;
+
     auto& params = processorRef.getParameters();
     positionAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::position, positionSlider);
     sprayAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::spray, spraySlider);
@@ -171,6 +198,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     lfo1RateAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::lfo1RateHz, lfo1RateSlider);
     lfo1DepthAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::lfo1Depth, lfo1DepthSlider);
     lfo1ShapeAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::lfo1Shape, lfo1ShapeSlider);
+    envAttackAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::envAttackMs, envAttackSlider);
+    envHoldAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::envHoldMs, envHoldSlider);
+    envDecayAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::envDecayMs, envDecaySlider);
+    envSustainAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::envSustain, envSustainSlider);
+    envReleaseAttachment = std::make_unique<SliderAttachment> (params, ParameterIDs::envReleaseMs, envReleaseSlider);
 
     // Density sync toggle (in Grain header)
     densitySyncButton.setName ("chip_mode");
@@ -359,6 +391,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     configurePageButton (samplePageButton, "chip_page_sample", "SAMPLE", Page::sample);
     configurePageButton (modulationPageButton, "chip_page_modulation", "MODULATION", Page::modulation);
+    configurePageButton (envelopePageButton, "chip_page_envelope", "ENVELOPE", Page::envelope);
     configurePageButton (settingsPageButton, "chip_page_settings", "SETTINGS", Page::settings);
     
     // Modern inline preset bar with SVG icons
@@ -599,6 +632,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     wrapHoverRepaint (lfo1DepthSlider);
     wrapHoverRepaint (lfo1ShapeSlider);
     wrapHoverRepaint (lfo1AmountSlider);
+    wrapHoverRepaint (envAttackSlider);
+    wrapHoverRepaint (envHoldSlider);
+    wrapHoverRepaint (envDecaySlider);
+    wrapHoverRepaint (envSustainSlider);
+    wrapHoverRepaint (envReleaseSlider);
 
     lfo1AmountSlider.setRange (-1.0, 1.0, 0.001);
     lfo1AmountSlider.setNumDecimalPlacesToDisplay (2);
@@ -659,12 +697,18 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
     lfo1DepthSlider.setLookAndFeel (nullptr);
     lfo1ShapeSlider.setLookAndFeel (nullptr);
     lfo1AmountSlider.setLookAndFeel (nullptr);
+    envAttackSlider.setLookAndFeel (nullptr);
+    envHoldSlider.setLookAndFeel (nullptr);
+    envDecaySlider.setLookAndFeel (nullptr);
+    envSustainSlider.setLookAndFeel (nullptr);
+    envReleaseSlider.setLookAndFeel (nullptr);
     maxVoicesSlider.setLookAndFeel (nullptr);
     lfo1SourceButton.setLookAndFeel (nullptr);
     softClipButton.setLookAndFeel (nullptr);
     trueStereoButton.setLookAndFeel (nullptr);
     samplePageButton.setLookAndFeel (nullptr);
     modulationPageButton.setLookAndFeel (nullptr);
+    envelopePageButton.setLookAndFeel (nullptr);
     settingsPageButton.setLookAndFeel (nullptr);
 #if SITO_ENABLE_INSPECTOR
     inspectorButton.setLookAndFeel (nullptr);
@@ -768,7 +812,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     else
         repaint (pageContentZone);
 
-    if (currentPage != Page::settings)
+    if (currentPage == Page::sample || currentPage == Page::modulation)
         repaint (controlsZone);
 }
 
@@ -1120,6 +1164,163 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
         g.drawLine (dotX, lfoArea.getY(), dotX, lfoArea.getBottom(), 1.0f);
 
     }
+    else if (currentPage == Page::envelope)
+    {
+        const auto panel = pageContentZone.toFloat();
+        const auto rawAlpha = pageTransitionState.isTransitioning ? pageTransitionState.fadeAlpha : 1.0f;
+        const auto easeOutCubic = 1.0f - std::pow (1.0f - rawAlpha, 3.0f);
+        const auto slideOffset = (1.0f - easeOutCubic) * 12.0f;
+
+        auto transitionedPanel = panel.translated (slideOffset, 0.0f);
+
+        g.setColour (cardColour.withAlpha (0.96f * easeOutCubic));
+        g.fillRoundedRectangle (transitionedPanel, 22.0f);
+        g.setColour (cardBorderColour.withAlpha (0.22f * easeOutCubic));
+        g.drawRoundedRectangle (transitionedPanel, 22.0f, 0.9f);
+
+        auto content = panel.reduced (32.0f, 28.0f);
+        auto heading = content.removeFromTop (26.0f);
+        auto subtitle = content.removeFromTop (18.0f);
+
+        g.setFont (juce::Font (juce::FontOptions (22.0f, juce::Font::bold)));
+        g.setColour (textPrimary.withAlpha (0.94f));
+        g.drawFittedText ("Envelope", heading.toNearestInt(), juce::Justification::centredLeft, 1);
+
+        g.setFont (juce::Font (juce::FontOptions (12.6f, juce::Font::plain)));
+        g.setColour (textSecondary.withAlpha (0.62f));
+        g.drawFittedText ("AHDSR contour for each played note", subtitle.toNearestInt(), juce::Justification::centredLeft, 1);
+
+        const auto previewPanel = envelopePreviewZone.toFloat();
+        g.setColour (juce::Colour (0xff1a1622).withAlpha (0.94f));
+        g.fillRoundedRectangle (previewPanel, 20.0f);
+        g.setColour (cardBorderColour.withAlpha (0.22f));
+        g.drawRoundedRectangle (previewPanel, 20.0f, 0.9f);
+
+        auto previewContent = previewPanel.reduced (24.0f, 24.0f);
+        auto previewTitle = previewContent.removeFromTop (18.0f);
+        previewContent.removeFromTop (16.0f);
+        auto stageRow = previewContent.removeFromBottom (24.0f);
+        previewContent.removeFromBottom (12.0f);
+        const auto curveArea = previewContent;
+
+        g.setFont (juce::Font (juce::FontOptions (12.8f, juce::Font::bold)));
+        g.setColour (textSecondary.withAlpha (0.72f));
+        g.drawFittedText ("Amplitude Contour", previewTitle.toNearestInt(), juce::Justification::centredLeft, 1);
+
+        const auto attackMs = static_cast<float> (envAttackSlider.getValue());
+        const auto holdMs = static_cast<float> (envHoldSlider.getValue());
+        const auto decayMs = static_cast<float> (envDecaySlider.getValue());
+        const auto sustain = static_cast<float> (envSustainSlider.getValue());
+        const auto releaseMs = static_cast<float> (envReleaseSlider.getValue());
+
+        const auto attackWeight = 0.14f + attackMs / 2200.0f;
+        const auto holdWeight = 0.10f + holdMs / 1800.0f;
+        const auto decayWeight = 0.14f + decayMs / 2200.0f;
+        const auto sustainWeight = 0.22f;
+        const auto releaseWeight = 0.16f + releaseMs / 2400.0f;
+        const auto totalWeight = attackWeight + holdWeight + decayWeight + sustainWeight + releaseWeight;
+
+        const auto attackEnd = attackWeight / totalWeight;
+        const auto holdEnd = attackEnd + holdWeight / totalWeight;
+        const auto decayEnd = holdEnd + decayWeight / totalWeight;
+        const auto sustainEnd = decayEnd + sustainWeight / totalWeight;
+
+        auto envAt = [&] (float t) -> float
+        {
+            const auto clampedT = juce::jlimit (0.0f, 1.0f, t);
+
+            if (clampedT <= attackEnd)
+            {
+                const auto local = attackEnd > 0.0f ? clampedT / attackEnd : 1.0f;
+                return std::pow (local, 0.78f);
+            }
+
+            if (clampedT <= holdEnd)
+                return 1.0f;
+
+            if (clampedT <= decayEnd)
+            {
+                const auto local = (clampedT - holdEnd) / juce::jmax (0.0001f, decayEnd - holdEnd);
+                return 1.0f + (sustain - 1.0f) * std::pow (local, 0.82f);
+            }
+
+            if (clampedT <= sustainEnd)
+                return sustain;
+
+            const auto local = (clampedT - sustainEnd) / juce::jmax (0.0001f, 1.0f - sustainEnd);
+            return sustain * (1.0f - std::pow (local, 0.86f));
+        };
+
+        juce::Path envPath;
+        juce::Path envFill;
+        const auto baseY = curveArea.getBottom();
+        for (int i = 0; i < 144; ++i)
+        {
+            const auto t = static_cast<float> (i) / 143.0f;
+            const auto x = curveArea.getX() + curveArea.getWidth() * t;
+            const auto y = baseY - curveArea.getHeight() * juce::jlimit (0.0f, 1.0f, envAt (t));
+            if (i == 0)
+            {
+                envPath.startNewSubPath (x, y);
+                envFill.startNewSubPath (x, baseY);
+                envFill.lineTo (x, y);
+            }
+            else
+            {
+                envPath.lineTo (x, y);
+                envFill.lineTo (x, y);
+            }
+        }
+        envFill.lineTo (curveArea.getRight(), baseY);
+        envFill.closeSubPath();
+
+        const auto sustainY = baseY - curveArea.getHeight() * sustain;
+        g.setColour (accentColour.withAlpha (0.08f));
+        g.fillRoundedRectangle (curveArea, 16.0f);
+        g.setColour (cardBorderColour.withAlpha (0.12f));
+        g.drawRoundedRectangle (curveArea, 16.0f, 0.8f);
+        g.setColour (textSecondary.withAlpha (0.18f));
+        g.drawLine (curveArea.getX(), curveArea.getY(), curveArea.getX(), curveArea.getBottom(), 1.0f);
+        g.drawLine (curveArea.getX(), baseY, curveArea.getRight(), baseY, 1.0f);
+        g.setColour (accentGlowColour.withAlpha (0.18f));
+        g.drawLine (curveArea.getX(), sustainY, curveArea.getRight(), sustainY, 1.0f);
+
+        const auto markerX1 = curveArea.getX() + curveArea.getWidth() * attackEnd;
+        const auto markerX2 = curveArea.getX() + curveArea.getWidth() * holdEnd;
+        const auto markerX3 = curveArea.getX() + curveArea.getWidth() * decayEnd;
+        const auto markerX4 = curveArea.getX() + curveArea.getWidth() * sustainEnd;
+        g.setColour (cardBorderColour.withAlpha (0.16f));
+        g.drawLine (markerX1, curveArea.getY(), markerX1, curveArea.getBottom(), 1.0f);
+        g.drawLine (markerX2, curveArea.getY(), markerX2, curveArea.getBottom(), 1.0f);
+        g.drawLine (markerX3, curveArea.getY(), markerX3, curveArea.getBottom(), 1.0f);
+        g.drawLine (markerX4, curveArea.getY(), markerX4, curveArea.getBottom(), 1.0f);
+
+        g.setColour (accentColour.withAlpha (0.10f));
+        g.fillPath (envFill);
+        g.setColour (accentGlowColour.withAlpha (0.18f));
+        g.strokePath (envPath, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (accentGlowColour.withAlpha (0.92f));
+        g.strokePath (envPath, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        auto stageRowInt = stageRow.toNearestInt();
+        constexpr int stageGap = 8;
+        const auto stageW = (stageRowInt.getWidth() - stageGap * 4) / 5;
+        const std::array<juce::String, 5> stageNames { "ATTACK", "HOLD", "DECAY", "SUSTAIN", "RELEASE" };
+        for (int i = 0; i < 5; ++i)
+        {
+            auto chip = stageRowInt.removeFromLeft (stageW);
+            if (i < 4)
+                stageRowInt.removeFromLeft (stageGap);
+
+            g.setColour (juce::Colour (0xff231a2d).withAlpha (0.88f));
+            g.fillRoundedRectangle (chip.toFloat(), 9.0f);
+            g.setColour ((i == 0 || i == 2 || i == 4 ? accentColour : cardBorderColour).withAlpha (0.32f));
+            g.drawRoundedRectangle (chip.toFloat(), 9.0f, 1.0f);
+            g.setFont (juce::Font (juce::FontOptions (11.2f, juce::Font::bold)));
+            g.setColour (textPrimary.withAlpha (0.86f));
+            g.drawFittedText (stageNames[static_cast<size_t> (i)], chip, juce::Justification::centred, 1);
+        }
+    }
     else if (currentPage == Page::settings)
     {
         const auto panel = pageContentZone.toFloat();
@@ -1272,17 +1473,113 @@ void AudioPluginAudioProcessorEditor::resized()
     bounds.removeFromTop (12);
     {
         auto tabsRow = topTabsZone;
-        tabsRow.removeFromLeft (tabsRow.getWidth() / 4);
-        tabsRow.removeFromRight (tabsRow.getWidth() / 3);
+        tabsRow.removeFromLeft (tabsRow.getWidth() / 8);
+        tabsRow.removeFromRight (tabsRow.getWidth() / 8);
 
         constexpr int tabGap = 12;
-        const auto tabW = (tabsRow.getWidth() - tabGap * 2) / 3;
+        const auto tabW = (tabsRow.getWidth() - tabGap * 3) / 4;
 
         samplePageButton.setBounds (tabsRow.removeFromLeft (tabW));
         tabsRow.removeFromLeft (tabGap);
         modulationPageButton.setBounds (tabsRow.removeFromLeft (tabW));
         tabsRow.removeFromLeft (tabGap);
+        envelopePageButton.setBounds (tabsRow.removeFromLeft (tabW));
+        tabsRow.removeFromLeft (tabGap);
         settingsPageButton.setBounds (tabsRow.removeFromLeft (tabW));
+    }
+
+    if (currentPage == Page::envelope)
+    {
+        pageContentZone = bounds;
+        sampleDropZone = {};
+        sampleWaveformZone = {};
+        sampleNameZone = {};
+        sampleEditBarZone = {};
+        sampleLengthZone = {};
+        controlsZone = {};
+        envelopePreviewZone = {};
+        envelopeInfoZone = {};
+        sampleHintLabel.setBounds ({});
+        rootKeyLabel.setBounds ({});
+        rootKeyCombo.setBounds ({});
+
+        positionSlider.setBounds ({});
+        spraySlider.setBounds ({});
+        grainSizeSlider.setBounds ({});
+        densitySlider.setBounds ({});
+        densitySyncSlider.setBounds ({});
+        densityRateSlider.setBounds ({});
+        shapeSlider.setBounds ({});
+        pitchSlider.setBounds ({});
+        spreadSlider.setBounds ({});
+        gainSlider.setBounds ({});
+
+        positionLabel.setBounds ({});
+        sprayLabel.setBounds ({});
+        grainSizeLabel.setBounds ({});
+        densityLabel.setBounds ({});
+        densityRateLabel.setBounds ({});
+        shapeLabel.setBounds ({});
+        pitchLabel.setBounds ({});
+        spreadLabel.setBounds ({});
+        gainLabel.setBounds ({});
+
+        densitySyncButton.setBounds ({});
+        densityTripletButton.setBounds ({});
+        densityDottedButton.setBounds ({});
+
+        lfo1SourceButton.setBounds ({});
+        lfo1RateSlider.setBounds ({});
+        lfo1DepthSlider.setBounds ({});
+        lfo1ShapeSlider.setBounds ({});
+        lfo1AmountSlider.setBounds ({});
+        lfo1RateLabel.setBounds ({});
+        lfo1DepthLabel.setBounds ({});
+        lfo1ShapeLabel.setBounds ({});
+        lfo1AmountLabel.setBounds ({});
+
+        trueStereoButton.setBounds ({});
+        softClipButton.setBounds ({});
+        voicesValueLabel.setBounds ({});
+        interpolationQualityCombo.setBounds ({});
+        maxVoicesSlider.setBounds ({});
+
+        auto content = pageContentZone.reduced (32, 28);
+        auto headingZone = content.removeFromTop (26);
+        juce::ignoreUnused (headingZone);
+        content.removeFromTop (20);
+        envelopePreviewZone = content.removeFromTop (264);
+        content.removeFromTop (24);
+        envelopeInfoZone = content.removeFromTop (132);
+
+        auto labelRow = envelopeInfoZone.removeFromTop (18);
+        envelopeInfoZone.removeFromTop (8);
+        auto knobRow = envelopeInfoZone.removeFromTop (96);
+
+        constexpr int envGap = 12;
+        const auto envSlotW = (knobRow.getWidth() - envGap * 4) / 5;
+
+        auto placeEnvelopeKnob = [&] (juce::Slider& slider, juce::Label& label, bool isPrimary)
+        {
+            label.setBounds (labelRow.removeFromLeft (envSlotW));
+            labelRow.removeFromLeft (envGap);
+
+            auto slot = knobRow.removeFromLeft (envSlotW);
+            knobRow.removeFromLeft (envGap);
+            slider.setBounds (slot);
+
+            if (knobAnimationStates.find (&slider) == knobAnimationStates.end())
+                knobAnimationStates[&slider] = KnobAnimationState();
+            knobAnimationStates[&slider].isPrimary = isPrimary;
+            slider.getProperties().set ("isPrimary", isPrimary);
+        };
+
+        placeEnvelopeKnob (envAttackSlider, envAttackLabel, true);
+        placeEnvelopeKnob (envHoldSlider, envHoldLabel, false);
+        placeEnvelopeKnob (envDecaySlider, envDecayLabel, true);
+        placeEnvelopeKnob (envSustainSlider, envSustainLabel, false);
+        placeEnvelopeKnob (envReleaseSlider, envReleaseLabel, true);
+        return;
     }
 
     // Settings page
@@ -1294,6 +1591,8 @@ void AudioPluginAudioProcessorEditor::resized()
         sampleNameZone = {};
         sampleEditBarZone = {};
         sampleLengthZone = {};
+        envelopePreviewZone = {};
+        envelopeInfoZone = {};
         controlsZone = {};
         sampleHintLabel.setBounds ({});
         rootKeyLabel.setBounds ({});
@@ -1333,6 +1632,16 @@ void AudioPluginAudioProcessorEditor::resized()
         lfo1DepthLabel.setBounds ({});
         lfo1ShapeLabel.setBounds ({});
         lfo1AmountLabel.setBounds ({});
+        envAttackSlider.setBounds ({});
+        envHoldSlider.setBounds ({});
+        envDecaySlider.setBounds ({});
+        envSustainSlider.setBounds ({});
+        envReleaseSlider.setBounds ({});
+        envAttackLabel.setBounds ({});
+        envHoldLabel.setBounds ({});
+        envDecayLabel.setBounds ({});
+        envSustainLabel.setBounds ({});
+        envReleaseLabel.setBounds ({});
 
         auto content = pageContentZone.reduced (32, 28);
         content.removeFromTop (64);
@@ -1361,6 +1670,8 @@ void AudioPluginAudioProcessorEditor::resized()
     sampleNameZone = {};
     sampleEditBarZone = {};
     sampleLengthZone = {};
+    envelopePreviewZone = {};
+    envelopeInfoZone = {};
     
     // Sample page header
     if (processorRef.hasLoadedSample() && currentPage == Page::sample)
@@ -1405,7 +1716,6 @@ void AudioPluginAudioProcessorEditor::resized()
     // 8 slots flow
     constexpr int slotGap = 10;
     const int slotW = (knobRow.getWidth() - slotGap * 7) / 8;
-    const int knobSize = juce::jlimit (62, 86, slotW - 6);
 
     auto placeKnob = [&] (juce::Rectangle<int>& labelRowRef, juce::Rectangle<int>& knobRowRef,
                           juce::Slider& slider, juce::Label& label, bool isPrimary)
@@ -1515,7 +1825,6 @@ void AudioPluginAudioProcessorEditor::resized()
         auto modKnobRow = content.removeFromTop (132);
         constexpr int modGap = 12;
         const int modSlotW = (modKnobRow.getWidth() - modGap * 2) / 3;
-        const int modKnobSize = juce::jlimit (62, 84, modSlotW - 12);
 
         auto placeModKnob = [&] (juce::Rectangle<int>& row, juce::Slider& slider, juce::Label& label)
         {
@@ -1541,6 +1850,17 @@ void AudioPluginAudioProcessorEditor::resized()
         lfo1ShapeLabel.setBounds ({});
         lfo1AmountLabel.setBounds ({});
     }
+
+    envAttackSlider.setBounds ({});
+    envHoldSlider.setBounds ({});
+    envDecaySlider.setBounds ({});
+    envSustainSlider.setBounds ({});
+    envReleaseSlider.setBounds ({});
+    envAttackLabel.setBounds ({});
+    envHoldLabel.setBounds ({});
+    envDecayLabel.setBounds ({});
+    envSustainLabel.setBounds ({});
+    envReleaseLabel.setBounds ({});
 }
 
 void AudioPluginAudioProcessorEditor::updatePageVisibility()
@@ -1555,9 +1875,11 @@ void AudioPluginAudioProcessorEditor::updatePageVisibility()
     
     samplePageButton.setToggleState (currentPage == Page::sample, juce::dontSendNotification);
     modulationPageButton.setToggleState (currentPage == Page::modulation, juce::dontSendNotification);
+    envelopePageButton.setToggleState (currentPage == Page::envelope, juce::dontSendNotification);
     settingsPageButton.setToggleState (currentPage == Page::settings, juce::dontSendNotification);
 
     const auto onSettings = currentPage == Page::settings;
+    const auto onEnvelope = currentPage == Page::envelope;
     const auto onWorkPage = currentPage == Page::sample || currentPage == Page::modulation;
 
     sampleHintLabel.setVisible (currentPage == Page::sample);
@@ -1598,6 +1920,17 @@ void AudioPluginAudioProcessorEditor::updatePageVisibility()
     lfo1DepthLabel.setVisible (onModulation);
     lfo1ShapeLabel.setVisible (onModulation);
     lfo1AmountLabel.setVisible (false);
+
+    envAttackSlider.setVisible (onEnvelope);
+    envHoldSlider.setVisible (onEnvelope);
+    envDecaySlider.setVisible (onEnvelope);
+    envSustainSlider.setVisible (onEnvelope);
+    envReleaseSlider.setVisible (onEnvelope);
+    envAttackLabel.setVisible (onEnvelope);
+    envHoldLabel.setVisible (onEnvelope);
+    envDecayLabel.setVisible (onEnvelope);
+    envSustainLabel.setVisible (onEnvelope);
+    envReleaseLabel.setVisible (onEnvelope);
 
     trueStereoButton.setVisible (onSettings);
     softClipButton.setVisible (onSettings);
@@ -1995,7 +2328,7 @@ void AudioPluginAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
     // Don't render modulation handles if preset browser is visible (z-order fix)
     const auto presetBrowserVisible = presetBrowser && presetBrowser->isVisible();
     
-    if (currentPage != Page::settings && !presetBrowserVisible)
+    if ((currentPage == Page::sample || currentPage == Page::modulation) && !presetBrowserVisible)
     {
         for (int index = 0; index < 8; ++index)
         {

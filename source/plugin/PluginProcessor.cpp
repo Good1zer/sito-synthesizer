@@ -74,6 +74,11 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     lfo1RateParam = parameters.getRawParameterValue (ParameterIDs::lfo1RateHz);
     lfo1DepthParam = parameters.getRawParameterValue (ParameterIDs::lfo1Depth);
     lfo1ShapeParam = parameters.getRawParameterValue (ParameterIDs::lfo1Shape);
+    envAttackParam = parameters.getRawParameterValue (ParameterIDs::envAttackMs);
+    envHoldParam = parameters.getRawParameterValue (ParameterIDs::envHoldMs);
+    envDecayParam = parameters.getRawParameterValue (ParameterIDs::envDecayMs);
+    envSustainParam = parameters.getRawParameterValue (ParameterIDs::envSustain);
+    envReleaseParam = parameters.getRawParameterValue (ParameterIDs::envReleaseMs);
     softClipEnabledParam = parameters.getRawParameterValue (ParameterIDs::softClipEnabled);
     maxVoicesParam = parameters.getRawParameterValue (ParameterIDs::maxVoices);
     trueStereoEnabledParam = parameters.getRawParameterValue (ParameterIDs::trueStereoEnabled);
@@ -182,6 +187,40 @@ AudioPluginAudioProcessor::createParameterLayout()
         ParameterNames::lfo1Shape,
         { 0.0f, 100.0f, 1.0f },
         ParameterDefaults::lfo1Shape));
+
+    params.push_back (makeFloatParameter (
+        { ParameterIDs::envAttackMs, 1 },
+        ParameterNames::envAttackMs,
+        { 0.0f, 4000.0f, 1.0f },
+        ParameterDefaults::envAttackMs,
+        "ms"));
+
+    params.push_back (makeFloatParameter (
+        { ParameterIDs::envHoldMs, 1 },
+        ParameterNames::envHoldMs,
+        { 0.0f, 2000.0f, 1.0f },
+        ParameterDefaults::envHoldMs,
+        "ms"));
+
+    params.push_back (makeFloatParameter (
+        { ParameterIDs::envDecayMs, 1 },
+        ParameterNames::envDecayMs,
+        { 0.0f, 4000.0f, 1.0f },
+        ParameterDefaults::envDecayMs,
+        "ms"));
+
+    params.push_back (makeFloatParameter (
+        { ParameterIDs::envSustain, 1 },
+        ParameterNames::envSustain,
+        { 0.0f, 1.0f, 0.001f },
+        ParameterDefaults::envSustain));
+
+    params.push_back (makeFloatParameter (
+        { ParameterIDs::envReleaseMs, 1 },
+        ParameterNames::envReleaseMs,
+        { 0.0f, 6000.0f, 1.0f },
+        ParameterDefaults::envReleaseMs,
+        "ms"));
 
     params.push_back (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParameterIDs::softClipEnabled, 1 },
@@ -395,6 +434,11 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                            densityHzUsed,
                            pitchWithRoot,
                            (shapeTypeUsed / 100.0f) * 3.0f,
+                           juce::jmax (0.0f, envAttackParam->load()),
+                           juce::jmax (0.0f, envHoldParam->load()),
+                           juce::jmax (0.0f, envDecayParam->load()),
+                           juce::jlimit (0.0f, 1.0f, envSustainParam->load()),
+                           juce::jmax (0.0f, envReleaseParam->load()),
                            softClipEnabledParam->load() >= 0.5f,
                            trueStereoEnabledParam->load() >= 0.5f,
                            useHighQualityInterpolation);

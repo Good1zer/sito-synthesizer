@@ -49,7 +49,8 @@ void GranularEngine::prepare (double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
     currentBlockSize = samplesPerBlock;
-    juce::ignoreUnused (currentBlockSize);
+    for (auto& scratch : voiceEnvelopeScratch)
+        scratch.assign (static_cast<size_t> (juce::jmax (1, currentBlockSize)), 0.0f);
     rebuildEnvelopeTables();
     reset();
 }
@@ -67,6 +68,11 @@ void GranularEngine::reset()
     smoothedDensityHz = 8.0f;
     smoothedPitchSemitones = 0.0f;
     smoothedShapeMorph = 1.0f;
+    smoothedEnvAttackMs = 12.0f;
+    smoothedEnvHoldMs = 0.0f;
+    smoothedEnvDecayMs = 220.0f;
+    smoothedEnvSustain = 0.82f;
+    smoothedEnvReleaseMs = 260.0f;
 }
 
 void GranularEngine::setMaxVoices (int newMax) noexcept
@@ -110,10 +116,13 @@ void GranularEngine::handleMidiEvent (const juce::MidiMessage& message)
         *target = {};
         target->isActive = true;
         target->isSpawning = true;
+        target->noteHeld = true;
         target->midiNote = message.getNoteNumber();
         target->velocity = message.getFloatVelocity();
         target->grainSpawnAccumulator = 1.0;  // Spawn first grain immediately
         target->startStamp = ++voiceStampCounter;
+        target->envelopeStage = EnvelopeStage::attack;
+        target->envelopeLevel = 0.0f;
     }
     else if (message.isNoteOff())
     {
@@ -121,7 +130,10 @@ void GranularEngine::handleMidiEvent (const juce::MidiMessage& message)
         {
             auto& voice = voices[static_cast<size_t> (i)];
             if (voice.isActive && voice.midiNote == message.getNoteNumber())
-                voice.isSpawning = false;
+            {
+                voice.noteHeld = false;
+                startVoiceRelease (voice);
+            }
         }
     }
     else if (message.isAllNotesOff() || message.isAllSoundOff())
@@ -130,7 +142,10 @@ void GranularEngine::handleMidiEvent (const juce::MidiMessage& message)
         {
             auto& voice = voices[static_cast<size_t> (i)];
             if (voice.isActive)
-                voice.isSpawning = false;
+            {
+                voice.noteHeld = false;
+                startVoiceRelease (voice);
+            }
         }
     }
 }
@@ -145,6 +160,11 @@ void GranularEngine::render (juce::AudioBuffer<float>& outputBuffer,
                              float densityHz,
                              float pitchSemitones,
                              float shapeMorph,
+                             float envAttackMs,
+                             float envHoldMs,
+                             float envDecayMs,
+                             float envSustain,
+                             float envReleaseMs,
                              bool softClipEnabled,
                              bool trueStereoEnabled,
                              bool useCubicInterpolation)
@@ -189,6 +209,11 @@ void GranularEngine::render (juce::AudioBuffer<float>& outputBuffer,
         smoothedDensityHz = SitoDSP::smoothParam (smoothedDensityHz, targetDensity, blockSeconds, 0.060);
         smoothedPitchSemitones = SitoDSP::smoothParam (smoothedPitchSemitones, pitchSemitones, blockSeconds, 0.050);
         smoothedShapeMorph = SitoDSP::smoothParam (smoothedShapeMorph, targetShapeMorph, blockSeconds, 0.050);
+        smoothedEnvAttackMs = SitoDSP::smoothParam (smoothedEnvAttackMs, juce::jmax (0.0f, envAttackMs), blockSeconds, 0.050);
+        smoothedEnvHoldMs = SitoDSP::smoothParam (smoothedEnvHoldMs, juce::jmax (0.0f, envHoldMs), blockSeconds, 0.050);
+        smoothedEnvDecayMs = SitoDSP::smoothParam (smoothedEnvDecayMs, juce::jmax (0.0f, envDecayMs), blockSeconds, 0.050);
+        smoothedEnvSustain = SitoDSP::smoothParam (smoothedEnvSustain, juce::jlimit (0.0f, 1.0f, envSustain), blockSeconds, 0.050);
+        smoothedEnvReleaseMs = SitoDSP::smoothParam (smoothedEnvReleaseMs, juce::jmax (0.0f, envReleaseMs), blockSeconds, 0.050);
 
         const auto clampedDensity = juce::jlimit (0.1f, maxEffectiveDensity, smoothedDensityHz);
         const auto clampedPosition = juce::jlimit (0.0f, 1.0f, smoothedPosition);
@@ -196,6 +221,11 @@ void GranularEngine::render (juce::AudioBuffer<float>& outputBuffer,
         const auto clampedSpread = juce::jlimit (0.0f, 1.0f, smoothedSpread);
         const auto clampedGrainSizeMs = juce::jmax (5.0f, smoothedGrainSizeMs);
         const auto clampedShapeMorph = juce::jlimit (0.0f, 3.0f, smoothedShapeMorph);
+        const auto clampedEnvAttackMs = juce::jmax (0.0f, smoothedEnvAttackMs);
+        const auto clampedEnvHoldMs = juce::jmax (0.0f, smoothedEnvHoldMs);
+        const auto clampedEnvDecayMs = juce::jmax (0.0f, smoothedEnvDecayMs);
+        const auto clampedEnvSustain = juce::jlimit (0.0f, 1.0f, smoothedEnvSustain);
+        const auto clampedEnvReleaseMs = juce::jmax (0.0f, smoothedEnvReleaseMs);
 
         // === GAIN COMPENSATION ===
         // Output gain with perceptual loudness compensation for stacked grains.
@@ -280,6 +310,21 @@ void GranularEngine::render (juce::AudioBuffer<float>& outputBuffer,
             auto& voice = voices[static_cast<size_t> (voiceIndex)];
             if (! voice.isActive)
                 continue;
+            
+            auto& voiceEnvelope = voiceEnvelopeScratch[static_cast<size_t> (voiceIndex)];
+            if (static_cast<int> (voiceEnvelope.size()) < outSamples)
+                voiceEnvelope.resize (static_cast<size_t> (outSamples), 0.0f);
+
+            for (int sample = 0; sample < outSamples; ++sample)
+            {
+                voiceEnvelope[static_cast<size_t> (sample)] = advanceVoiceEnvelope (voice,
+                                                                                     1,
+                                                                                     clampedEnvAttackMs,
+                                                                                     clampedEnvHoldMs,
+                                                                                     clampedEnvDecayMs,
+                                                                                     clampedEnvSustain,
+                                                                                     clampedEnvReleaseMs);
+            }
 
             for (auto& grain : voice.grains)
             {
@@ -319,9 +364,11 @@ void GranularEngine::render (juce::AudioBuffer<float>& outputBuffer,
                     const auto alpha = static_cast<float> (grain.sourceSamplePosition - static_cast<double> (index));
                     jassert (alpha >= 0.0f && alpha <= 1.0f);
                     
+                    const auto voiceEnvelopeValue = voiceEnvelope[static_cast<size_t> (sample)];
+
                     // Apply grain envelope (window function) to avoid clicks
                     const auto grainEnvelope = getEnvelopeValue (grain, shapeMorphConst);
-                    const auto grainGain = grainBaseGain * grainEnvelope;
+                    const auto grainGain = grainBaseGain * grainEnvelope * voiceEnvelopeValue;
 
                     if (isMonoOutput)
                     {
@@ -408,6 +455,9 @@ void GranularEngine::render (juce::AudioBuffer<float>& outputBuffer,
         for (int voiceIndex = 0; voiceIndex < voiceLimit; ++voiceIndex)
         {
             auto& voice = voices[static_cast<size_t> (voiceIndex)];
+            if (voice.isActive && ! voice.noteHeld && voice.envelopeLevel <= 0.0f)
+                voice.isSpawning = false;
+
             if (voice.isActive && ! voice.isSpawning && ! voiceHasActiveGrains (voice))
                 voice = {};
         }
@@ -435,7 +485,7 @@ void GranularEngine::render (juce::AudioBuffer<float>& outputBuffer,
 
                     const auto pos = static_cast<float> (grain.sourceSamplePosition) / denom;
                     const auto env = getEnvelopeValue (grain, shapeMorphConst);
-                    const auto strength = juce::jlimit (0.0f, 1.0f, env * grain.amplitude);
+                    const auto strength = juce::jlimit (0.0f, 1.0f, env * grain.amplitude * voice.envelopeLevel);
                     const auto pan = juce::jlimit (-1.0f, 1.0f, grain.panR - grain.panL);
 
                     grainVisuals[static_cast<size_t> (writeIndex)] = { juce::jlimit (0.0f, 1.0f, pos), strength, pan };
@@ -572,4 +622,88 @@ bool GranularEngine::voiceHasActiveGrains (const Voice& voice) const
         if (grain.isActive)
             return true;
     return false;
+}
+
+float GranularEngine::advanceVoiceEnvelope (Voice& voice,
+                                            int samplesToAdvance,
+                                            float attackMs,
+                                            float holdMs,
+                                            float decayMs,
+                                            float sustainLevel,
+                                            float releaseMs) noexcept
+{
+    if (! voice.isActive)
+        return 0.0f;
+
+    const auto samplesPerMs = static_cast<float> (currentSampleRate / 1000.0);
+
+    for (int step = 0; step < samplesToAdvance; ++step)
+    {
+        switch (voice.envelopeStage)
+        {
+            case EnvelopeStage::idle:
+                voice.envelopeLevel = 0.0f;
+                break;
+
+            case EnvelopeStage::attack:
+            {
+                const auto attackSamples = juce::jmax (1, static_cast<int> (std::round (attackMs * samplesPerMs)));
+                voice.envelopeLevel += 1.0f / static_cast<float> (attackSamples);
+                if (voice.envelopeLevel >= 1.0f)
+                {
+                    voice.envelopeLevel = 1.0f;
+                    voice.envelopeSamplesRemaining = juce::jmax (0, static_cast<int> (std::round (holdMs * samplesPerMs)));
+                    voice.envelopeStage = voice.envelopeSamplesRemaining > 0 ? EnvelopeStage::hold : EnvelopeStage::decay;
+                }
+                break;
+            }
+
+            case EnvelopeStage::hold:
+                if (--voice.envelopeSamplesRemaining <= 0)
+                    voice.envelopeStage = EnvelopeStage::decay;
+                break;
+
+            case EnvelopeStage::decay:
+            {
+                const auto decaySamples = juce::jmax (1, static_cast<int> (std::round (decayMs * samplesPerMs)));
+                voice.envelopeLevel += (sustainLevel - 1.0f) / static_cast<float> (decaySamples);
+                if (voice.envelopeLevel <= sustainLevel)
+                {
+                    voice.envelopeLevel = sustainLevel;
+                    voice.envelopeStage = EnvelopeStage::sustain;
+                }
+                break;
+            }
+
+            case EnvelopeStage::sustain:
+                voice.envelopeLevel = sustainLevel;
+                if (! voice.noteHeld)
+                    startVoiceRelease (voice);
+                break;
+
+            case EnvelopeStage::release:
+            {
+                const auto releaseSamples = juce::jmax (1, static_cast<int> (std::round (releaseMs * samplesPerMs)));
+                voice.envelopeLevel -= voice.releaseStartLevel / static_cast<float> (releaseSamples);
+                if (voice.envelopeLevel <= 0.0f)
+                {
+                    voice.envelopeLevel = 0.0f;
+                    voice.envelopeStage = EnvelopeStage::idle;
+                }
+                break;
+            }
+        }
+    }
+
+    return juce::jlimit (0.0f, 1.0f, voice.envelopeLevel);
+}
+
+void GranularEngine::startVoiceRelease (Voice& voice) noexcept
+{
+    if (! voice.isActive || voice.envelopeStage == EnvelopeStage::idle || voice.envelopeStage == EnvelopeStage::release)
+        return;
+
+    voice.isSpawning = true;
+    voice.envelopeStage = EnvelopeStage::release;
+    voice.releaseStartLevel = juce::jmax (0.0f, voice.envelopeLevel);
 }

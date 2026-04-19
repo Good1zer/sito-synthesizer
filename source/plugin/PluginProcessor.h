@@ -32,6 +32,11 @@ namespace ParameterIDs
     static constexpr auto lfo1RateHz = "lfo1RateHz";
     static constexpr auto lfo1Depth = "lfo1Depth";
     static constexpr auto lfo1Shape = "lfo1Shape";
+    static constexpr auto envAttackMs = "envAttackMs";
+    static constexpr auto envHoldMs = "envHoldMs";
+    static constexpr auto envDecayMs = "envDecayMs";
+    static constexpr auto envSustain = "envSustain";
+    static constexpr auto envReleaseMs = "envReleaseMs";
     static constexpr auto softClipEnabled = "softClipEnabled";
     static constexpr auto maxVoices = "maxVoices";
     static constexpr auto trueStereoEnabled = "trueStereoEnabled";
@@ -56,6 +61,11 @@ namespace ParameterNames
     static constexpr auto lfo1RateHz = "LFO 1 Rate";
     static constexpr auto lfo1Depth = "LFO 1 Depth";
     static constexpr auto lfo1Shape = "LFO 1 Shape";
+    static constexpr auto envAttackMs = "Attack";
+    static constexpr auto envHoldMs = "Hold";
+    static constexpr auto envDecayMs = "Decay";
+    static constexpr auto envSustain = "Sustain";
+    static constexpr auto envReleaseMs = "Release";
     static constexpr auto softClipEnabled = "Soft Clip";
     static constexpr auto maxVoices = "Max Voices";
     static constexpr auto trueStereoEnabled = "True Stereo";
@@ -80,6 +90,11 @@ namespace ParameterDefaults
     static constexpr float lfo1RateHz = 0.35f;
     static constexpr float lfo1Depth = 1.0f;
     static constexpr float lfo1Shape = 0.0f;
+    static constexpr float envAttackMs = 12.0f;
+    static constexpr float envHoldMs = 0.0f;
+    static constexpr float envDecayMs = 220.0f;
+    static constexpr float envSustain = 0.82f;
+    static constexpr float envReleaseMs = 260.0f;
     static constexpr bool softClipEnabled = true;
     static constexpr int maxVoices = 8;
     static constexpr bool trueStereoEnabled = true;
@@ -168,6 +183,11 @@ private:
     std::atomic<float>* lfo1RateParam = nullptr;
     std::atomic<float>* lfo1DepthParam = nullptr;
     std::atomic<float>* lfo1ShapeParam = nullptr;
+    std::atomic<float>* envAttackParam = nullptr;
+    std::atomic<float>* envHoldParam = nullptr;
+    std::atomic<float>* envDecayParam = nullptr;
+    std::atomic<float>* envSustainParam = nullptr;
+    std::atomic<float>* envReleaseParam = nullptr;
     std::atomic<float>* softClipEnabledParam = nullptr;
     std::atomic<float>* maxVoicesParam = nullptr;
     std::atomic<float>* trueStereoEnabledParam = nullptr;

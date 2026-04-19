@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <vector>
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
@@ -35,6 +36,11 @@ public:
                  float densityHz,
                  float pitchSemitones,
                  float shapeMorph,
+                 float envAttackMs,
+                 float envHoldMs,
+                 float envDecayMs,
+                 float envSustain,
+                 float envReleaseMs,
                  bool softClipEnabled,
                  bool trueStereoEnabled,
                  bool useCubicInterpolation);
@@ -42,6 +48,16 @@ public:
     int copyGrainVisuals (GrainVisual* dest, int maxToCopy) const noexcept;
 
 private:
+    enum class EnvelopeStage
+    {
+        idle,
+        attack,
+        hold,
+        decay,
+        sustain,
+        release
+    };
+
     struct Grain
     {
         bool isActive = false;
@@ -58,10 +74,15 @@ private:
     {
         bool isActive = false;
         bool isSpawning = false;
+        bool noteHeld = false;
         int midiNote = -1;
         float velocity = 0.0f;
         double grainSpawnAccumulator = 0.0;
         int64_t startStamp = 0;
+        EnvelopeStage envelopeStage = EnvelopeStage::idle;
+        int envelopeSamplesRemaining = 0;
+        float envelopeLevel = 0.0f;
+        float releaseStartLevel = 0.0f;
         std::array<Grain, 24> grains;
     };
 
@@ -78,6 +99,14 @@ private:
                      float pitchSemitones);
 
     float getEnvelopeValue (const Grain& grain, float shapeMorph) const;
+    float advanceVoiceEnvelope (Voice& voice,
+                                int samplesToAdvance,
+                                float attackMs,
+                                float holdMs,
+                                float decayMs,
+                                float sustainLevel,
+                                float releaseMs) noexcept;
+    void startVoiceRelease (Voice& voice) noexcept;
 
     bool voiceHasActiveGrains (const Voice& voice) const;
 
@@ -100,8 +129,14 @@ private:
     float smoothedDensityHz = 8.0f;
     float smoothedPitchSemitones = 0.0f;
     float smoothedShapeMorph = 1.0f;
+    float smoothedEnvAttackMs = 12.0f;
+    float smoothedEnvHoldMs = 0.0f;
+    float smoothedEnvDecayMs = 220.0f;
+    float smoothedEnvSustain = 0.82f;
+    float smoothedEnvReleaseMs = 260.0f;
 
     std::array<std::array<float, envelopeTableSize>, 4> envelopeTables {};
+    std::array<std::vector<float>, maxVoices> voiceEnvelopeScratch;
 
     std::array<GrainVisual, maxGrainVisuals> grainVisuals {};
     std::atomic<int> grainVisualCount { 0 };

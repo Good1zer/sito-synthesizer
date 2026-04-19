@@ -45,6 +45,7 @@ private:
     {
         sample,
         modulation,
+        envelope,
         settings
     };
 
@@ -108,6 +109,8 @@ private:
     juce::Rectangle<int> sampleNameZone;
     juce::Rectangle<int> sampleEditBarZone;
     juce::Rectangle<int> sampleLengthZone;
+    juce::Rectangle<int> envelopePreviewZone;
+    juce::Rectangle<int> envelopeInfoZone;
     juce::Rectangle<int> sourceHeaderZone;
     juce::Rectangle<int> grainHeaderZone;
     juce::Rectangle<int> outputHeaderZone;
@@ -156,8 +159,14 @@ private:
     juce::Slider lfo1DepthSlider;
     juce::Slider lfo1ShapeSlider;
     juce::Slider lfo1AmountSlider;
+    juce::Slider envAttackSlider;
+    juce::Slider envHoldSlider;
+    juce::Slider envDecaySlider;
+    juce::Slider envSustainSlider;
+    juce::Slider envReleaseSlider;
     juce::ToggleButton samplePageButton;
     juce::ToggleButton modulationPageButton;
+    juce::ToggleButton envelopePageButton;
     juce::ToggleButton settingsPageButton;
     juce::DrawableButton presetPrevButton { "prev", juce::DrawableButton::ImageFitted };
     juce::DrawableButton presetNextButton { "next", juce::DrawableButton::ImageFitted };
@@ -191,6 +200,11 @@ private:
     juce::Label lfo1DepthLabel;
     juce::Label lfo1ShapeLabel;
     juce::Label lfo1AmountLabel;
+    juce::Label envAttackLabel;
+    juce::Label envHoldLabel;
+    juce::Label envDecayLabel;
+    juce::Label envSustainLabel;
+    juce::Label envReleaseLabel;
     juce::Label maxVoicesLabel;
     juce::Label voicesValueLabel;
     juce::Label rootKeyLabel;
@@ -210,6 +224,11 @@ private:
     std::unique_ptr<SliderAttachment> lfo1RateAttachment;
     std::unique_ptr<SliderAttachment> lfo1DepthAttachment;
     std::unique_ptr<SliderAttachment> lfo1ShapeAttachment;
+    std::unique_ptr<SliderAttachment> envAttackAttachment;
+    std::unique_ptr<SliderAttachment> envHoldAttachment;
+    std::unique_ptr<SliderAttachment> envDecayAttachment;
+    std::unique_ptr<SliderAttachment> envSustainAttachment;
+    std::unique_ptr<SliderAttachment> envReleaseAttachment;
     std::unique_ptr<ButtonAttachment> softClipAttachment;
     std::unique_ptr<ButtonAttachment> trueStereoAttachment;
     std::unique_ptr<ButtonAttachment> densitySyncEnabledAttachment;
