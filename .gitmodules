@@ -14,3 +14,6 @@
 	path = modules/clap-juce-extensions
 	url = https://github.com/free-audio/clap-juce-extensions.git
 	branch = main
+[submodule "JIVE"]
+	path = JIVE
+	url = git@github.com:ImJimmi/JIVE.git
