@@ -115,12 +115,13 @@ void SitoLookAndFeel::drawRotarySlider (juce::Graphics& g,
         g.fillRoundedRectangle (badgeArea, 3.0f);
         
         g.setColour (getTextPrimaryColour());
-        g.setFont (juce::Font (8.0f, juce::Font::bold));
+        g.setFont (juce::Font (juce::FontOptions (8.0f, juce::Font::bold)));
         g.drawFittedText ("MOD", badgeArea.toNearestInt(), juce::Justification::centred, 1);
         
         // Pulse glow around knob when modulation is active
         float pulsePhase = std::fmod (static_cast<float>(juce::Time::getMillisecondCounterHiRes()) / 1500.0f, 1.0f);
         float pulseAlpha = 0.2f + 0.3f * std::sin (pulsePhase * juce::MathConstants<float>::twoPi);
+        pulseAlpha = juce::jlimit (0.0f, 1.0f, pulseAlpha);
         
         g.setColour (getAccentGlowColour().withAlpha (pulseAlpha));
         g.drawEllipse (knobBounds.expanded (4.0f), 1.5f);

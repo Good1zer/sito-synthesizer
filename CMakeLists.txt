@@ -1,16 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 
-# This tells cmake we have goodies in the /cmake folder
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(PamplejuceVersion)
-
-# Modern concise way to add dependencies to your project
 include(CPM)
-
-# Configures universal binaries and decides which version of macOS to support
 include(PamplejuceMacOS)
-
-# Couple tweaks that IMO should be JUCE defaults
 include(JUCEDefaults)
 
 # =========================
@@ -30,6 +23,7 @@ include(PamplejuceLog)
 # Dependencies
 # =========================
 add_subdirectory(JUCE)
+add_subdirectory(JIVE)
 add_subdirectory(modules/clap-juce-extensions EXCLUDE_FROM_ALL)
 add_subdirectory(modules/melatonin_inspector)
 
@@ -82,13 +76,15 @@ include(Assets)
 # =========================
 target_compile_definitions(SharedCode
     INTERFACE
-    JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0
-    JUCE_VST3_CAN_REPLACE_VST2=0
-    SITO_ENABLE_INSPECTOR=$<IF:$<CONFIG:Debug>,1,0>
-    CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
-    VERSION="${CURRENT_VERSION}"
-    PRODUCT_NAME_WITHOUT_VERSION="SITO"
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        SITO_ENABLE_INSPECTOR=$<IF:$<CONFIG:Debug>,1,0>
+        CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
+        VERSION="${CURRENT_VERSION}"
+        PRODUCT_NAME_WITHOUT_VERSION="SITO"
+
+        JIVE_GUI_ITEMS_HAVE_STYLE_SHEETS=1
 )
 
 # =========================
@@ -96,16 +92,24 @@ target_compile_definitions(SharedCode
 # =========================
 target_link_libraries(SharedCode
     INTERFACE
-    Assets
-    $<$<CONFIG:Debug>:melatonin_inspector>
-    juce_audio_utils
-    juce_audio_processors
-    juce_dsp
-    juce_gui_basics
-    juce_gui_extra
-    juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
-    juce::juce_recommended_warning_flags
+        Assets
+        $<$<CONFIG:Debug>:melatonin_inspector>
+
+        # JUCE
+        juce_audio_utils
+        juce_audio_processors
+        juce_dsp
+        juce_gui_basics
+        juce_gui_extra
+
+        # JIVE (namespaced targets)
+        jive::jive_layouts
+        jive::jive_style_sheets
+
+        # Рекомендованные флаги JUCE
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
 )
 
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
@@ -120,13 +124,6 @@ include(XcodePrettify)
 # IDE Grouping
 # =========================
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/source FILES ${SourceFiles})
-
-# =========================
-# Tests & Benchmarks
-# =========================
-# Uncomment to enable tests and benchmarks
-# include(Tests)
-# include(Benchmarks)
 
 # =========================
 # CI Output

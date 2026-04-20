@@ -1084,7 +1084,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
         
         // Premium transition: ease-out cubic + slide
         const auto rawAlpha = pageTransitionState.isTransitioning ? pageTransitionState.fadeAlpha : 1.0f;
-        const auto easeOutCubic = 1.0f - std::pow(1.0f - rawAlpha, 3.0f);
+        const auto easeOutCubic = juce::jlimit (0.0f, 1.0f, 1.0f - std::pow(1.0f - rawAlpha, 3.0f));
         const auto slideOffset = (1.0f - easeOutCubic) * 12.0f;
         
         auto transitionedPanel = panel.translated(slideOffset, 0.0f);
@@ -1168,7 +1168,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     {
         const auto panel = pageContentZone.toFloat();
         const auto rawAlpha = pageTransitionState.isTransitioning ? pageTransitionState.fadeAlpha : 1.0f;
-        const auto easeOutCubic = 1.0f - std::pow (1.0f - rawAlpha, 3.0f);
+        const auto easeOutCubic = juce::jlimit (0.0f, 1.0f, 1.0f - std::pow (1.0f - rawAlpha, 3.0f));
         const auto slideOffset = (1.0f - easeOutCubic) * 12.0f;
 
         auto transitionedPanel = panel.translated (slideOffset, 0.0f);
@@ -2362,7 +2362,7 @@ void AudioPluginAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
             g.fillEllipse (scaledHandle);
             
             // Enhanced glow during assignment workflow
-            g.setColour (tint.withAlpha (bypassed ? 0.34f : (isHot ? 0.95f : 0.72f) + handleState.glowAlpha * 0.3f));
+            g.setColour (tint.withAlpha (juce::jlimit (0.0f, 1.0f, bypassed ? 0.34f : (isHot ? 0.95f : 0.72f) + handleState.glowAlpha * 0.3f)));
             g.drawEllipse (scaledHandle, isHot ? 1.6f : 1.2f);
 
             juce::Path amountArc;
