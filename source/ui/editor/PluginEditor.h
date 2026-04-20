@@ -1,264 +1,40 @@
 #pragma once
 
 #include "plugin/PluginProcessor.h"
-#include "ui/lookandfeel/SitoLookAndFeel.h"
-#include "ui/preset/PresetBrowser.h"
 
-#include <array>
-#include <limits>
+#include <jive_layouts/jive_layouts.h>
 
-#if SITO_ENABLE_INSPECTOR
-#include "melatonin_inspector/melatonin_inspector.h"
-#endif
-
-//==============================================================================
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               public juce::FileDragAndDropTarget,
-                                              public PresetManager::Listener,
-                                              private juce::Timer
+                                              public PresetManager::Listener
 {
 public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
     ~AudioPluginAudioProcessorEditor() override;
 
-    void paint (juce::Graphics&) override;
-    void paintOverChildren (juce::Graphics&) override;
     void resized() override;
-    void mouseDown (const juce::MouseEvent&) override;
-    void mouseDrag (const juce::MouseEvent&) override;
-    void mouseUp (const juce::MouseEvent&) override;
-    void mouseMove (const juce::MouseEvent&) override;
-    void mouseExit (const juce::MouseEvent&) override;
-    bool keyPressed (const juce::KeyPress&) override;
+
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
-    void fileDragEnter (const juce::StringArray& files, int x, int y) override;
-    void fileDragMove (const juce::StringArray& files, int x, int y) override;
-    void fileDragExit (const juce::StringArray& files) override;
     void filesDropped (const juce::StringArray& files, int x, int y) override;
-    
-    // PresetManager::Listener
+
     void presetListChanged() override;
     void currentPresetChanged (const juce::String& presetName) override;
 
 private:
-    enum class Page
-    {
-        sample,
-        modulation,
-        envelope,
-        settings
-    };
+    static juce::ValueTree createEditorView();
 
-    struct KnobAnimationState
-    {
-        float hoverAlpha = 0.0f;
-        float arcAnimationPhase = 0.0f;
-        bool isPrimary = false;
-    };
+    static bool hasSupportedSampleExtension (const juce::File& file);
+    static juce::ValueTree findNodeWithID (const juce::ValueTree& root, const juce::Identifier& id);
 
-    struct PageTransitionState
-    {
-        float fadeAlpha = 1.0f;
-        Page targetPage = Page::sample;
-        bool isTransitioning = false;
-    };
-
-    struct ModulationHandleState
-    {
-        float scaleAmount = 1.0f;
-        float glowAlpha = 0.0f;
-        bool isAssigned = false;
-    };
-
-    struct AssignmentWorkflowState
-    {
-        float dragLineAlpha = 0.0f;
-        float targetPulsePhase = 0.0f;
-        float assignmentFeedbackAlpha = 0.0f;
-        bool isAssignmentComplete = false;
-    };
-
-    void timerCallback() override;
+    void attachParameters();
+    void setTextNodeContent (const juce::Identifier& id, const juce::String& text);
     void updateSampleStatus();
-    void configureKnob (juce::Slider& slider, juce::Label& label, const juce::String& text);
-    juce::Rectangle<float> getWaveformArea() const;
-    std::unique_ptr<juce::Drawable> loadSVGIcon (const void* data, size_t size);
-    bool beginWaveformInteraction (const juce::MouseEvent&);
-    void updateWaveformInteraction (const juce::MouseEvent&);
-    void updatePageVisibility();
-    void updateVoicesValueDisplay();
-    void updateModulationAmountDisplay();
-    bool isAssignableSlider (const juce::Slider* slider) const;
-    juce::String getParameterIDForSlider (const juce::Slider* slider) const;
-    juce::Slider* getSliderForModulationTarget (int index) const;
-    juce::Slider* getAssignableSliderAt (juce::Point<float> position) const;
-    juce::Rectangle<float> getModulationHandleBoundsForTarget (int index) const;
-    int getModulationHandleTargetAt (juce::Point<float> position) const;
-    void selectModulationTargetSlider (juce::Slider* slider);
-    float getLfoPreviewValue() const noexcept;
-    static float evaluateLfoPreview (float phase, float shape) noexcept;
-    void refreshModulationSliderDecorations();
-    void toggleInspector();
 
     AudioPluginAudioProcessor& processorRef;
-    SitoLookAndFeel lookAndFeel;
-    juce::Rectangle<int> sampleDropZone;
-    juce::Rectangle<int> controlsZone;
-    juce::Rectangle<int> pageContentZone;
-    juce::Rectangle<int> sampleWaveformZone;
-    juce::Rectangle<int> sampleNameZone;
-    juce::Rectangle<int> sampleEditBarZone;
-    juce::Rectangle<int> sampleLengthZone;
-    juce::Rectangle<int> envelopePreviewZone;
-    juce::Rectangle<int> envelopeInfoZone;
-    juce::Rectangle<int> sourceHeaderZone;
-    juce::Rectangle<int> grainHeaderZone;
-    juce::Rectangle<int> outputHeaderZone;
-    juce::Rectangle<int> topTabsZone;
-    bool isDraggingSample = false;
-    juce::Slider* hoveredSlider = nullptr;
-    juce::Component* hoveredAssistComponent = nullptr;
-    bool isDraggingWaveformPosition = false;
-    bool isDraggingWaveformSpray = false;
-    bool isDraggingVoicesValue = false;
-    bool isDraggingModulationSource = false;
-    bool isDraggingModulationHandle = false;
-    float voicesDragStartY = 0.0f;
-    double voicesDragStartValue = 0.0;
-    juce::Point<float> modulationDragPosition;
-    float modulationHandleDragStartY = 0.0f;
-    float modulationHandleStartAmount = 0.0f;
-     float lfoPreviewPhase = 0.0f;
-     float waveformPulsePhase = 0.0f;
-     int selectedModulationTarget = -1;
-    int hoveredModulationTarget = -1;
-    int draggingModulationTarget = -1;
-    Page currentPage = Page::sample;
-    uint64_t lastSeenSampleGeneration = std::numeric_limits<uint64_t>::max();
-
-    juce::Label titleLabel;
-    juce::Label subtitleLabel;
-    juce::Label sampleStatusLabel;
-    juce::Label sampleHintLabel;
-
-    juce::GroupComponent sourceGroup;
-    juce::GroupComponent grainGroup;
-    juce::GroupComponent outputGroup;
-
-    juce::Slider positionSlider;
-    juce::Slider spraySlider;
-    juce::Slider grainSizeSlider;
-    juce::Slider densitySlider;
-    juce::Slider densitySyncSlider; // hidden param driver (0..17)
-    juce::Slider densityRateSlider; // visible in BPM mode (0..N-1)
-    juce::Slider pitchSlider;
-    juce::Slider gainSlider;
-    juce::Slider shapeSlider;
-    juce::Slider spreadSlider;
-    juce::Slider lfo1RateSlider;
-    juce::Slider lfo1DepthSlider;
-    juce::Slider lfo1ShapeSlider;
-    juce::Slider lfo1AmountSlider;
-    juce::Slider envAttackSlider;
-    juce::Slider envHoldSlider;
-    juce::Slider envDecaySlider;
-    juce::Slider envSustainSlider;
-    juce::Slider envReleaseSlider;
-    juce::ToggleButton samplePageButton;
-    juce::ToggleButton modulationPageButton;
-    juce::ToggleButton envelopePageButton;
-    juce::ToggleButton settingsPageButton;
-    juce::DrawableButton presetPrevButton { "prev", juce::DrawableButton::ImageFitted };
-    juce::DrawableButton presetNextButton { "next", juce::DrawableButton::ImageFitted };
-    juce::Label presetNameLabel;
-#if SITO_ENABLE_INSPECTOR
-    juce::ToggleButton inspectorButton;
-#endif
-    juce::DrawableButton presetSaveButton { "save", juce::DrawableButton::ImageFitted };
-    juce::DrawableButton presetMenuButton { "menu", juce::DrawableButton::ImageFitted };
-    juce::ToggleButton lfo1SourceButton;
-    juce::ToggleButton softClipButton;
-    juce::ToggleButton trueStereoButton;
-    juce::ToggleButton densitySyncButton;
-    juce::ToggleButton densityTripletButton;
-    juce::ToggleButton densityDottedButton;
-    juce::Slider maxVoicesSlider;
-    juce::ComboBox interpolationQualityCombo;
-    juce::ComboBox rootKeyCombo;
-
-    juce::Label positionLabel;
-    juce::Label sprayLabel;
-    juce::Label grainSizeLabel;
-    juce::Label densityLabel;
-    juce::Label densitySyncLabel; // hidden driver label
-    juce::Label densityRateLabel; // visible in BPM mode
-    juce::Label pitchLabel;
-    juce::Label gainLabel;
-    juce::Label shapeLabel;
-    juce::Label spreadLabel;
-    juce::Label lfo1RateLabel;
-    juce::Label lfo1DepthLabel;
-    juce::Label lfo1ShapeLabel;
-    juce::Label lfo1AmountLabel;
-    juce::Label envAttackLabel;
-    juce::Label envHoldLabel;
-    juce::Label envDecayLabel;
-    juce::Label envSustainLabel;
-    juce::Label envReleaseLabel;
-    juce::Label maxVoicesLabel;
-    juce::Label voicesValueLabel;
-    juce::Label rootKeyLabel;
-
-    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
-    using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
-    using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
-    std::unique_ptr<SliderAttachment> positionAttachment;
-    std::unique_ptr<SliderAttachment> sprayAttachment;
-    std::unique_ptr<SliderAttachment> grainSizeAttachment;
-    std::unique_ptr<SliderAttachment> densityAttachment;
-    std::unique_ptr<SliderAttachment> densitySyncAttachment;
-    std::unique_ptr<SliderAttachment> pitchAttachment;
-    std::unique_ptr<SliderAttachment> gainAttachment;
-    std::unique_ptr<SliderAttachment> shapeAttachment;
-    std::unique_ptr<SliderAttachment> spreadAttachment;
-    std::unique_ptr<SliderAttachment> lfo1RateAttachment;
-    std::unique_ptr<SliderAttachment> lfo1DepthAttachment;
-    std::unique_ptr<SliderAttachment> lfo1ShapeAttachment;
-    std::unique_ptr<SliderAttachment> envAttackAttachment;
-    std::unique_ptr<SliderAttachment> envHoldAttachment;
-    std::unique_ptr<SliderAttachment> envDecayAttachment;
-    std::unique_ptr<SliderAttachment> envSustainAttachment;
-    std::unique_ptr<SliderAttachment> envReleaseAttachment;
-    std::unique_ptr<ButtonAttachment> softClipAttachment;
-    std::unique_ptr<ButtonAttachment> trueStereoAttachment;
-    std::unique_ptr<ButtonAttachment> densitySyncEnabledAttachment;
-    std::unique_ptr<ButtonAttachment> densitySyncTripletEnabledAttachment;
-    std::unique_ptr<ButtonAttachment> densitySyncDottedEnabledAttachment;
-    std::unique_ptr<SliderAttachment> maxVoicesAttachment;
-    std::unique_ptr<ComboBoxAttachment> interpolationQualityAttachment;
-    std::unique_ptr<ComboBoxAttachment> rootKeyAttachment;
-
-    std::array<int, 18> densityRateCodes {};
-    int densityRateCodeCount = 0;
-    bool isUpdatingDensityRateUI = false;
-    
-    // Knob animation states for visual hierarchy
-    std::map<juce::Slider*, KnobAnimationState> knobAnimationStates;
-    
-    // Page transition animation state
-    PageTransitionState pageTransitionState;
-    
-    // Modulation handle animation states
-    std::map<int, ModulationHandleState> modulationHandleStates;
-    
-    // Assignment workflow state for drag-to-assign feedback
-    AssignmentWorkflowState assignmentWorkflowState;
-    
-    std::unique_ptr<PresetBrowser> presetBrowser;
-
-#if SITO_ENABLE_INSPECTOR
-    std::unique_ptr<melatonin::Inspector> inspector;
-#endif
+    jive::Interpreter interpreter;
+    juce::ValueTree editorView;
+    std::unique_ptr<jive::GuiItem> rootItem;
+    juce::Component* rootComponent = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessorEditor)
 };
