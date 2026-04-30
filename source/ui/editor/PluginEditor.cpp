@@ -99,12 +99,15 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     setSize (width, height);
 
     attachParameters();
+    lastSeenSampleGeneration = processorRef.getLoadedSampleGeneration();
     updateSampleStatus();
     currentPresetChanged (processorRef.getPresetManager().getCurrentPresetName());
+    startTimerHz (10);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 {
+    stopTimer();
     processorRef.getPresetManager().removeListener (this);
 }
 
@@ -148,6 +151,7 @@ void AudioPluginAudioProcessorEditor::presetListChanged()
 void AudioPluginAudioProcessorEditor::currentPresetChanged (const juce::String& presetName)
 {
     setTextNodeContent ("preset-name", presetName.isNotEmpty() ? presetName : "Init");
+    updateSampleStatus();
 }
 
 juce::ValueTree AudioPluginAudioProcessorEditor::createEditorView()
@@ -258,7 +262,7 @@ juce::ValueTree AudioPluginAudioProcessorEditor::createEditorView()
                     { "gap", 10 },
                 },
                 {
-                    makeLabel ("Modulation + Envelope"),
+                    makeLabel ("LFO + Envelope"),
                     juce::ValueTree {
                         "Component",
                         {
@@ -301,9 +305,34 @@ juce::ValueTree AudioPluginAudioProcessorEditor::createEditorView()
                             makeToggle (ParameterIDs::softClipEnabled, "Soft Clip"),
                             makeToggle (ParameterIDs::trueStereoEnabled, "True Stereo"),
                             makeToggle (ParameterIDs::densitySyncEnabled, "Density Sync"),
-                            makeToggle (ParameterIDs::densitySyncTripletEnabled, "Triplet"),
-                            makeToggle (ParameterIDs::densitySyncDottedEnabled, "Dotted"),
-                            makeKnob (ParameterIDs::densitySyncDivision, "Division", "0", "17", "1"),
+                            juce::ValueTree {
+                                "ComboBox",
+                                {
+                                    { "id", ParameterIDs::densitySyncDivision },
+                                    { "width", 160 },
+                                    { "height", 28 },
+                                },
+                                {
+                                    juce::ValueTree { "Option", { { "text", "1/1" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/2" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/4" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/8" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/16" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/32" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/1." } } },
+                                    juce::ValueTree { "Option", { { "text", "1/2." } } },
+                                    juce::ValueTree { "Option", { { "text", "1/4." } } },
+                                    juce::ValueTree { "Option", { { "text", "1/8." } } },
+                                    juce::ValueTree { "Option", { { "text", "1/16." } } },
+                                    juce::ValueTree { "Option", { { "text", "1/32." } } },
+                                    juce::ValueTree { "Option", { { "text", "1/1T" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/2T" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/4T" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/8T" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/16T" } } },
+                                    juce::ValueTree { "Option", { { "text", "1/32T" } } },
+                                },
+                            },
                             makeKnob (ParameterIDs::maxVoices, "Voices", "1", "16", "1"),
                             juce::ValueTree {
                                 "ComboBox",
@@ -385,8 +414,6 @@ void AudioPluginAudioProcessorEditor::attachParameters()
         ParameterIDs::densityHz,
         ParameterIDs::densitySyncEnabled,
         ParameterIDs::densitySyncDivision,
-        ParameterIDs::densitySyncTripletEnabled,
-        ParameterIDs::densitySyncDottedEnabled,
         ParameterIDs::pitchSemitones,
         ParameterIDs::shapeType,
         ParameterIDs::lfo1RateHz,
@@ -428,4 +455,14 @@ void AudioPluginAudioProcessorEditor::setTextNodeContent (const juce::Identifier
 void AudioPluginAudioProcessorEditor::updateSampleStatus()
 {
     setTextNodeContent ("sample-status", formatSampleStatus (processorRef));
+}
+
+void AudioPluginAudioProcessorEditor::timerCallback()
+{
+    const auto sampleGeneration = processorRef.getLoadedSampleGeneration();
+    if (sampleGeneration == lastSeenSampleGeneration)
+        return;
+
+    lastSeenSampleGeneration = sampleGeneration;
+    updateSampleStatus();
 }

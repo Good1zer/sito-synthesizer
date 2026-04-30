@@ -6,7 +6,8 @@
 
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               public juce::FileDragAndDropTarget,
-                                              public PresetManager::Listener
+                                              public PresetManager::Listener,
+                                              private juce::Timer
 {
 public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
@@ -29,12 +30,14 @@ private:
     void attachParameters();
     void setTextNodeContent (const juce::Identifier& id, const juce::String& text);
     void updateSampleStatus();
+    void timerCallback() override;
 
     AudioPluginAudioProcessor& processorRef;
     jive::Interpreter interpreter;
     juce::ValueTree editorView;
     std::unique_ptr<jive::GuiItem> rootItem;
     juce::Component* rootComponent = nullptr;
+    uint64_t lastSeenSampleGeneration = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessorEditor)
 };
