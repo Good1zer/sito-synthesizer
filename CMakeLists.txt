@@ -17,6 +17,8 @@ set(FORMATS VST3 Standalone CLAP)
 
 project(${PROJECT_NAME} VERSION ${CURRENT_VERSION})
 
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 include(PamplejuceLog)
 
 # =========================
