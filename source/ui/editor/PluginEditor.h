@@ -7,7 +7,8 @@
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               public juce::FileDragAndDropTarget,
                                               public PresetManager::Listener,
-                                              private juce::Timer
+                                              private juce::Timer,
+                                              private juce::ValueTree::Listener
 {
 public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
@@ -22,6 +23,14 @@ public:
     void currentPresetChanged (const juce::String& presetName) override;
 
 private:
+    enum class Page
+    {
+        sample,
+        modulation,
+        envelope,
+        settings
+    };
+
     static juce::ValueTree createEditorView();
 
     static bool hasSupportedSampleExtension (const juce::File& file);
@@ -30,14 +39,26 @@ private:
     void attachParameters();
     void setTextNodeContent (const juce::Identifier& id, const juce::String& text);
     void updateSampleStatus();
+    void syncPageVisibility();
+    void syncModulationRoutingUi();
     void timerCallback() override;
+    void valueTreePropertyChanged (juce::ValueTree& treeWhosePropertyHasChanged,
+                                   const juce::Identifier& property) override;
 
     AudioPluginAudioProcessor& processorRef;
     jive::Interpreter interpreter;
     juce::ValueTree editorView;
     std::unique_ptr<jive::GuiItem> rootItem;
     juce::Component* rootComponent = nullptr;
+    std::unique_ptr<jive::Event> clearAssignmentEvent;
+    std::unique_ptr<jive::Event> samplePageEvent;
+    std::unique_ptr<jive::Event> modulationPageEvent;
+    std::unique_ptr<jive::Event> envelopePageEvent;
+    std::unique_ptr<jive::Event> settingsPageEvent;
     uint64_t lastSeenSampleGeneration = 0;
+    Page currentPage = Page::sample;
+    int selectedModulationTarget = 0;
+    bool isSyncingModulationUi = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessorEditor)
 };
